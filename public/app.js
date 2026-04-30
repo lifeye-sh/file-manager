@@ -898,7 +898,7 @@ function closePreview() {
 
 function renderImagePreview(entry) {
   // Build list of images in the current folder
-  const imageList = state.entries.filter(e => e.type === 'file' && getFileCategory(e) === 'image');
+  const imageList = sortEntries([...state.entries]).filter(e => e.type === 'file' && getFileCategory(e) === 'image');
   let currentIndex = imageList.findIndex(e => getFilePath(e) === getFilePath(entry));
   if (currentIndex < 0) currentIndex = 0;
 
