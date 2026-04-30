@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件管理器</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Sidebar: Directory Tree -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h2>文件管理器</h2>
+    </div>
+    <nav id="tree" class="tree-view">
+      <div class="tree-loading">加载中...</div>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="refresh-btn" class="btn-icon" title="刷新">&#x21bb;</button>
+      <span id="root-path" class="root-label"></span>
+      <button id="settings-btn" class="btn-icon" title="设置">&#x2699;</button>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+  <!-- Main Content -->
+  <main id="main">
+    <!-- Breadcrumb -->
+    <div id="breadcrumb" class="breadcrumb">
+      <button id="sidebar-toggle" title="目录">☰</button>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar" class="toolbar">
+      <div class="toolbar-left">
+        <span id="item-count"></span>
+        <select id="sort-select" class="sort-select">
+          <option value="default">默认排序</option>
+          <option value="name-asc">名称 ↑</option>
+          <option value="name-desc">名称 ↓</option>
+          <option value="mtime-desc">修改时间 ↓</option>
+          <option value="mtime-asc">修改时间 ↑</option>
+          <option value="birthtime-desc">创建时间 ↓</option>
+          <option value="birthtime-asc">创建时间 ↑</option>
+          <option value="size-desc">大小 ↓</option>
+          <option value="size-asc">大小 ↑</option>
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <button id="new-folder-btn" class="btn-toolbar" title="新建文件夹">📂+</button>
+	        <button id="upload-btn" class="btn-toolbar" title="上传文件">⬆</button>
+	        <input type="file" id="upload-input" class="upload-hidden" multiple>
+	        <input type="text" id="search-input" class="search-input" placeholder="搜索文件...">
+      </div>
+    </div>
+
+    <!-- File Grid -->
+    <div id="file-list" class="file-list">
+      <div class="loading-placeholder">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+      </div>
+    </div>
+
+    <!-- Batch Action Bar (bottom) -->
+    <div id="batch-bar" class="batch-bar hidden">
+      <span id="batch-count">已选 0 项</span>
+      <button id="batch-rename-btn" class="btn-toolbar">✏️ 批量重命名</button>
+      <button id="batch-move-btn" class="btn-toolbar">📁 批量移动</button>
+      <button id="batch-delete-btn" class="btn-toolbar danger-btn">🗑 批量删除</button>
+      <button id="batch-clear-btn" class="btn-toolbar">✕ 取消选择</button>
+    </div>
+  </main>
+
+  <!-- Preview Overlay -->
+  <div id="preview-overlay" class="preview-overlay hidden">
+    <div id="preview-container" class="preview-container">
+      <div class="preview-header">
+        <span id="preview-title" class="preview-title"></span>
+        <span id="image-counter" class="image-counter hidden"></span>
+        <div class="preview-actions">
+          <a id="preview-edit" class="btn-icon hidden" title="编辑">&#x270E;</a>
+          <button id="preview-rotate" class="btn-icon hidden" title="旋转">&#x21bb;</button>
+          <a id="preview-download" class="btn-icon" title="下载" download>&#x2913;</a>
+          <button id="preview-close" class="btn-icon" title="关闭">&times;</button>
+        </div>
+      </div>
+      <div id="preview-content" class="preview-content">
+        <div class="spinner"></div>
+      </div>
+      <button id="image-nav-prev" class="image-nav image-nav-prev hidden" title="上一张">&lsaquo;</button>
+      <button id="image-nav-next" class="image-nav image-nav-next hidden" title="下一张">&rsaquo;</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-overlay" class="preview-overlay hidden">
+    <div class="settings-modal">
+      <div class="settings-header">
+        <h3>设置</h3>
+        <button id="settings-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-field">
+          <label for="settings-root">根目录路径</label>
+          <input type="text" id="settings-root" class="settings-input" placeholder="输入要管理的根目录路径...">
+          <span id="settings-root-error" class="settings-error"></span>
+        </div>
+        <div class="settings-field">
+          <label for="settings-port">端口</label>
+          <input type="number" id="settings-port" class="settings-input" placeholder="3000" min="1" max="65535">
+          <span class="settings-hint">修改后需重启服务生效</span>
+          <span id="settings-port-error" class="settings-error"></span>
+        </div>
+        <div class="settings-field">
+          <label for="settings-bind">绑定地址 (每行一个)</label>
+          <textarea id="settings-bind" class="settings-input settings-textarea" placeholder="0.0.0.0" rows="3"></textarea>
+          <span class="settings-hint">修改后需重启服务生效。0.0.0.0 表示监听所有网卡，127.0.0.1 仅本机访问。多个 IP 每行一个或逗号分隔。</span>
+          <span id="settings-bind-error" class="settings-error"></span>
+        </div>
+        <div class="settings-field">
+          <label for="settings-whitelist">IP 白名单 (每行一个)</label>
+          <textarea id="settings-whitelist" class="settings-input settings-textarea" placeholder="127.0.0.1&#10;192.168.1.0/24" rows="4"></textarea>
+          <span class="settings-hint">留空表示允许所有 IP 访问。支持 CIDR 格式如 192.168.1.0/24。本地 IP (127.0.0.1 / ::1) 始终允许。</span>
+          <span id="settings-whitelist-error" class="settings-error"></span>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button id="settings-cancel" class="btn-secondary">取消</button>
+        <button id="settings-save" class="btn-primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="context-menu hidden">
+    <div id="ctx-rename" class="context-menu-item">✏️ 重命名</div>
+    <div id="ctx-download" class="context-menu-item">⬇ 下载</div>
+    <div id="ctx-move" class="context-menu-item">📁 移动到...</div>
+    <div class="context-menu-sep"></div>
+    <div id="ctx-delete" class="context-menu-item danger">🗑 删除</div>
+  </div>
+
+  <!-- Operation Dialog (rename / new folder) -->
+  <div id="dialog-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal">
+      <div class="dialog-header">
+        <h3 id="dialog-title">重命名</h3>
+        <button id="dialog-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <input type="text" id="dialog-input" class="settings-input" placeholder="">
+        <span id="dialog-error" class="settings-error"></span>
+      </div>
+      <div class="dialog-footer">
+        <button id="dialog-cancel" class="btn-secondary">取消</button>
+        <button id="dialog-confirm" class="btn-primary">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Move Dialog (folder picker) -->
+  <div id="move-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal" style="height: 420px;">
+      <div class="dialog-header">
+        <h3 id="move-title">移动到文件夹</h3>
+        <button id="move-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div class="dialog-body move-body">
+        <div id="move-tree" class="move-tree">
+          <div class="tree-spinner"></div>
+        </div>
+        <span id="move-error" class="settings-error"></span>
+      </div>
+      <div class="dialog-footer">
+        <span id="move-current" class="move-current-label"></span>
+        <button id="move-cancel" class="btn-secondary">取消</button>
+        <button id="move-confirm" class="btn-primary">移动到此处</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch Rename Dialog -->
+  <div id="batch-rename-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal" style="width: 500px;">
+      <div class="dialog-header">
+        <h3>批量重命名</h3>
+        <button id="batch-rename-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div class="dialog-body" style="display:flex;flex-direction:column;gap:16px;">
+        <div class="settings-field">
+          <label>重命名方式</label>
+          <select id="batch-rename-mode" class="settings-input" style="font-family:inherit;">
+            <option value="prefix">添加前缀</option>
+            <option value="suffix">添加后缀</option>
+            <option value="replace">查找替换</option>
+            <option value="number">序号命名</option>
+          </select>
+        </div>
+        <div id="batch-rename-args"></div>
+        <span id="batch-rename-error" class="settings-error"></span>
+      </div>
+      <div class="dialog-footer">
+        <button id="batch-rename-cancel" class="btn-secondary">取消</button>
+        <button id="batch-rename-confirm" class="btn-primary">确认重命名</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
