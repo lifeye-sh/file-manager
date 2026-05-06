@@ -1,3 +1,4 @@
 node_modules/
 .thumbcache/
 config.json
+config.json.enc

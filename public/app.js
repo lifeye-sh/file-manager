@@ -6,7 +6,7 @@ const state = {
   treeNodes: {},     // path -> { expanded, loaded, children }
   previewFile: null,
   selected: new Set(),      // Set of entry paths for multi-select
-  sortKey: 'default',       // sort dropdown value
+  sortKey: 'mtime-desc',    // sort dropdown value
 };
 
 // === DOM References ===
@@ -240,15 +240,91 @@ async function apiSave(filePath, content) {
   return res.json();
 }
 
+// === Drag-and-drop move ===
+let _dragPaths = []; // module-level, avoids browser dataTransfer quirks
+let _listDropCounter = 0;
+
+function setupDropZones() {
+  dom.fileList.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    _listDropCounter++;
+    dom.fileList.classList.add('drop-active');
+  });
+  dom.fileList.addEventListener('dragleave', () => {
+    _listDropCounter--;
+    if (_listDropCounter <= 0) { _listDropCounter = 0; dom.fileList.classList.remove('drop-active'); }
+  });
+  dom.fileList.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'none';
+  });
+  dom.fileList.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dom.fileList.classList.remove('drop-active');
+    _listDropCounter = 0;
+  });
+}
+
+async function handleDrop(targetDir) {
+  if (_dragPaths.length === 0) return;
+
+  const moves = _dragPaths.filter(p => {
+    const parent = p.substring(0, p.lastIndexOf('/'));
+    return parent !== targetDir && p !== targetDir;
+  });
+  if (moves.length === 0) return;
+
+  let ok = 0, fail = 0;
+  for (const src of moves) {
+    try {
+      await apiMove(src, targetDir);
+      ok++;
+    } catch (err) {
+      fail++;
+      showToast(`移动 ${src.split('/').pop()} 失败: ${err.message}`, 'error');
+    }
+  }
+  if (ok > 0) {
+    showToast(`已移动 ${ok} 项`, 'success');
+    clearSelection();
+    refreshCurrent(true);
+  }
+}
+
 // === Breadcrumb ===
 function renderBreadcrumb() {
   dom.breadcrumb.innerHTML = '';
   const parts = state.currentPath ? state.currentPath.split('/') : [];
 
+  const makeDropTarget = (seg, targetPath) => {
+    let _dropCounter = 0;
+    seg.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      _dropCounter++;
+      seg.classList.add('drop-target');
+    });
+    seg.addEventListener('dragleave', () => {
+      _dropCounter--;
+      if (_dropCounter <= 0) { _dropCounter = 0; seg.classList.remove('drop-target'); }
+    });
+    seg.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    seg.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      seg.classList.remove('drop-target');
+      _dropCounter = 0;
+      handleDrop(targetPath);
+    });
+  };
+
   const root = document.createElement('span');
   root.className = 'breadcrumb-segment';
   root.textContent = 'Root';
   root.addEventListener('click', () => navigateTo(''));
+  makeDropTarget(root, '');
   dom.breadcrumb.appendChild(root);
 
   parts.forEach((part, i) => {
@@ -263,6 +339,7 @@ function renderBreadcrumb() {
     if (i === parts.length - 1) seg.classList.add('current');
     const targetPath = parts.slice(0, i + 1).join('/');
     seg.addEventListener('click', () => navigateTo(targetPath));
+    makeDropTarget(seg, targetPath);
     dom.breadcrumb.appendChild(seg);
   });
 }
@@ -275,7 +352,192 @@ function formatSize(bytes) {
   return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
+// === Lazy-load state ===
+const PAGE_SIZE = 60;
+let _allEntries = [];
+let _renderedCount = 0;
+let _sentinel = null;
+let _sentinelObserver = null;
+
+function createFileCard(entry) {
+  const card = document.createElement('div');
+  card.className = 'file-card';
+  const category = getFileCategory(entry);
+  const fileUrl = entry.type === 'file' ? getFileUrl(entry) : null;
+  const entryPath = getFilePath(entry);
+
+  card.dataset.entryPath = entryPath;
+  if (state.selected.has(entryPath)) card.classList.add('selected');
+
+  const check = document.createElement('div');
+  check.className = 'card-check';
+  check.textContent = '✓';
+  card.appendChild(check);
+
+  const thumb = document.createElement('div');
+  thumb.className = `file-card-thumb ${category}`;
+
+  if (category === 'image' && fileUrl) {
+    const img = document.createElement('img');
+    img.src = getThumbUrl(entry);
+    img.loading = 'lazy';
+    img.alt = entry.name;
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      thumb.innerHTML = FILE_ICONS.image;
+      thumb.classList.add('fallback-icon');
+    });
+    thumb.appendChild(img);
+  } else if (category === 'video' && fileUrl) {
+    thumb.innerHTML = FILE_ICONS.video;
+    thumb.classList.add('fallback-icon');
+    thumb.dataset.videoUrl = fileUrl;
+    thumb.dataset.videoThumb = 'pending';
+  } else {
+    thumb.innerHTML = FILE_ICONS[category];
+    thumb.classList.add('fallback-icon');
+  }
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'file-card-name';
+  nameEl.title = entry.name;
+  nameEl.textContent = entry.name;
+
+  const meta = document.createElement('div');
+  meta.className = 'file-card-meta';
+  meta.textContent = entry.type === 'file' ? formatSize(entry.size) : '';
+
+  card.appendChild(thumb);
+  card.appendChild(nameEl);
+  card.appendChild(meta);
+
+  card.addEventListener('click', (e) => {
+    if (_dragJustEnded) { _dragJustEnded = false; return; }
+    if (e.shiftKey && state._lastClicked) {
+      e.stopPropagation();
+      selectRange(state._lastClicked, entryPath);
+    } else if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
+      toggleSelect(entryPath, card);
+      state._lastClicked = entryPath;
+    } else {
+      clearSelection();
+      state.selected.add(entryPath);
+      card.classList.add('selected');
+      state._lastClicked = entryPath;
+      updateBatchBar();
+    }
+  });
+
+  card.addEventListener('dblclick', () => {
+    clearSelection();
+    state._lastClicked = null;
+    if (entry.type === 'directory') navigateTo(entryPath);
+    else openPreview(entry);
+  });
+
+  card.addEventListener('contextmenu', (e) => {
+    if (state.selected.size > 0 && state.selected.has(entryPath)) {
+      showContextMenu(e, entry);
+    } else {
+      clearSelection();
+      state.selected.add(entryPath);
+      state._lastClicked = entryPath;
+      card.classList.add('selected');
+      updateBatchBar();
+      showContextMenu(e, entry);
+    }
+  });
+
+  // Long press for context menu on touch
+  let longPressTimer = null;
+  let touchStartPos = null;
+  card.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { clearTimeout(longPressTimer); return; }
+    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    longPressTimer = setTimeout(() => {
+      if (dragState && dragState.started) return;
+      const ev = new MouseEvent('contextmenu', {
+        clientX: touchStartPos.x, clientY: touchStartPos.y, bubbles: true, cancelable: true
+      });
+      e.target.dispatchEvent(ev);
+    }, 600);
+  }, { passive: false });
+  card.addEventListener('touchmove', (e) => {
+    if (touchStartPos) {
+      const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
+      const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
+      if (dx > 5 || dy > 5) { clearTimeout(longPressTimer); longPressTimer = null; }
+    }
+  });
+  card.addEventListener('touchend', () => { clearTimeout(longPressTimer); longPressTimer = null; });
+  card.addEventListener('touchcancel', () => { clearTimeout(longPressTimer); longPressTimer = null; });
+
+  // --- Drag and drop ---
+  card.draggable = true;
+  card.addEventListener('dragstart', (e) => {
+    if (dragState && dragState.started) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', entryPath);
+    if (state.selected.size > 1 && state.selected.has(entryPath)) {
+      _dragPaths = [...state.selected];
+    } else {
+      if (!state.selected.has(entryPath)) {
+        clearSelection();
+        state.selected.add(entryPath);
+        card.classList.add('selected');
+        updateBatchBar();
+      }
+      _dragPaths = [entryPath];
+    }
+    setTimeout(() => card.classList.add('dragging'), 0);
+  });
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    _dragPaths = [];
+    document.querySelectorAll('.file-card.drop-target').forEach(el => el.classList.remove('drop-target'));
+    document.querySelectorAll('.breadcrumb-segment.drop-target').forEach(el => el.classList.remove('drop-target'));
+    dom.fileList.classList.remove('drop-active');
+  });
+  if (entry.type === 'directory') {
+    card.addEventListener('dragenter', (e) => { e.preventDefault(); e.stopPropagation(); card.classList.add('drop-target'); });
+    card.addEventListener('dragleave', () => { card.classList.remove('drop-target'); });
+    card.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; });
+    card.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); card.classList.remove('drop-target'); handleDrop(entryPath); });
+  }
+
+  return card;
+}
+
+function _teardownSentinel() {
+  if (_sentinelObserver) { _sentinelObserver.disconnect(); _sentinelObserver = null; }
+  if (_sentinel && _sentinel.parentNode) _sentinel.remove();
+  _sentinel = null;
+}
+
+function _ensureSentinel() {
+  if (_sentinel || _renderedCount >= _allEntries.length) return;
+  _sentinel = document.createElement('div');
+  _sentinel.className = 'lazy-sentinel';
+  dom.fileList.appendChild(_sentinel);
+  _sentinelObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) loadMore();
+  }, { rootMargin: '400px' });
+  _sentinelObserver.observe(_sentinel);
+}
+
+function loadMore() {
+  if (_renderedCount >= _allEntries.length) { _teardownSentinel(); return; }
+  _teardownSentinel();
+  const nextBatch = _allEntries.slice(_renderedCount, _renderedCount + PAGE_SIZE);
+  nextBatch.forEach((entry) => dom.fileList.appendChild(createFileCard(entry)));
+  _renderedCount += nextBatch.length;
+  _ensureSentinel();
+  requestAnimationFrame(() => generateVideoThumbnails());
+}
+
 function renderFileList(entries) {
+  _teardownSentinel();
   dom.fileList.innerHTML = '';
 
   if (entries.length === 0) {
@@ -284,6 +546,8 @@ function renderFileList(entries) {
       <p>此文件夹为空</p>
     </div>`;
     dom.itemCount.textContent = '0 项';
+    _allEntries = [];
+    _renderedCount = 0;
     return;
   }
 
@@ -291,126 +555,11 @@ function renderFileList(entries) {
   const fileCount = entries.length - folderCount;
   dom.itemCount.textContent = `${folderCount} 个文件夹, ${fileCount} 个文件`;
 
-  entries.forEach((entry) => {
-    const card = document.createElement('div');
-    card.className = 'file-card';
-    const category = getFileCategory(entry);
-    const fileUrl = entry.type === 'file' ? getFileUrl(entry) : null;
-    const entryPath = getFilePath(entry);
+  _allEntries = entries;
+  _renderedCount = 0;
 
-    if (state.selected.has(entryPath)) card.classList.add('selected');
-
-    // Selection checkbox
-    const check = document.createElement('div');
-    check.className = 'card-check';
-    check.textContent = '✓';
-    card.appendChild(check);
-
-    // Thumbnail area
-    const thumb = document.createElement('div');
-    thumb.className = `file-card-thumb ${category}`;
-
-    if (category === 'image' && fileUrl) {
-      const img = document.createElement('img');
-      img.src = getThumbUrl(entry);
-      img.loading = 'lazy';
-      img.alt = entry.name;
-      img.addEventListener('error', () => {
-        img.style.display = 'none';
-        thumb.innerHTML = FILE_ICONS.image;
-        thumb.classList.add('fallback-icon');
-      });
-      thumb.appendChild(img);
-    } else if (category === 'video' && fileUrl) {
-      thumb.innerHTML = FILE_ICONS.video;
-      thumb.classList.add('fallback-icon');
-      thumb.dataset.videoUrl = fileUrl;
-      thumb.dataset.videoThumb = 'pending';
-    } else {
-      thumb.innerHTML = FILE_ICONS[category];
-      thumb.classList.add('fallback-icon');
-    }
-
-    const nameEl = document.createElement('div');
-    nameEl.className = 'file-card-name';
-    nameEl.title = entry.name;
-    nameEl.textContent = entry.name;
-
-    const meta = document.createElement('div');
-    meta.className = 'file-card-meta';
-    meta.textContent = entry.type === 'file' ? formatSize(entry.size) : '';
-
-    card.appendChild(thumb);
-    card.appendChild(nameEl);
-    card.appendChild(meta);
-
-    card.addEventListener('click', (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl+Click: toggle selection
-        e.stopPropagation();
-        toggleSelect(entryPath, card);
-      } else {
-        // Single click: select this item only
-        clearSelection();
-        state.selected.add(entryPath);
-        card.classList.add('selected');
-        updateBatchBar();
-      }
-    });
-
-    card.addEventListener('dblclick', () => {
-      // Double click: open
-      clearSelection();
-      if (entry.type === 'directory') {
-        navigateTo(entryPath);
-      } else {
-        openPreview(entry);
-      }
-    });
-
-    card.addEventListener('contextmenu', (e) => {
-      if (state.selected.size > 0 && state.selected.has(entryPath)) {
-        showContextMenu(e, entry);
-      } else {
-        clearSelection();
-        card.classList.add('selected');
-        state.selected.add(entryPath);
-        updateBatchBar();
-        showContextMenu(e, entry);
-      }
-    });
-
-    // Long press for context menu on touch devices
-    let longPressTimer = null;
-    let touchStartPos = null;
-    card.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) { clearTimeout(longPressTimer); return; }
-      touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      longPressTimer = setTimeout(() => {
-        if (dragState && dragState.started) return;
-        const ev = new MouseEvent('contextmenu', {
-          clientX: touchStartPos.x, clientY: touchStartPos.y, bubbles: true, cancelable: true
-        });
-        e.target.dispatchEvent(ev);
-      }, 600);
-    }, { passive: false });
-    card.addEventListener('touchmove', (e) => {
-      if (touchStartPos) {
-        const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
-        const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
-        if (dx > 5 || dy > 5) { clearTimeout(longPressTimer); longPressTimer = null; }
-      }
-    });
-    card.addEventListener('touchend', () => { clearTimeout(longPressTimer); longPressTimer = null; });
-    card.addEventListener('touchcancel', () => { clearTimeout(longPressTimer); longPressTimer = null; });
-
-    dom.fileList.appendChild(card);
-  });
-
+  loadMore();
   updateBatchBar();
-
-  // Lazy-load video thumbnails
-  requestAnimationFrame(() => generateVideoThumbnails());
 }
 
 function generateVideoThumbnails() {
@@ -1097,29 +1246,8 @@ function renderAudioPreview(url, name) {
   dom.previewContent.appendChild(wrapper);
 }
 
-async function renderTextPreview(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text = await res.text();
-
-  // View mode
-  const viewArea = document.createElement('div');
-  viewArea.id = 'text-view';
-  const pre = document.createElement('pre');
-  pre.className = 'line-numbers';
-  const code = document.createElement('code');
-  text.split('\n').forEach((line) => {
-    const span = document.createElement('span');
-    span.textContent = line || '​'; // zero-width space for empty lines
-    code.appendChild(span);
-  });
-  pre.appendChild(code);
-  viewArea.appendChild(pre);
-
-  // Also update save: rebuild text from lines
-  const getTextFromEditor = () => textarea.value;
-
-  // Edit mode
+// Shared text editor factory — used by both text and markdown previews
+function createTextEditor(initialText, viewArea, onViewRefresh) {
   const editArea = document.createElement('div');
   editArea.id = 'text-edit';
   editArea.className = 'hidden';
@@ -1137,17 +1265,10 @@ async function renderTextPreview(url) {
 
   const textarea = document.createElement('textarea');
   textarea.className = 'preview-editor';
-  textarea.value = text;
+  textarea.value = initialText;
 
   editArea.appendChild(toolbar);
   editArea.appendChild(textarea);
-
-  dom.previewContent.innerHTML = '';
-  dom.previewContent.appendChild(viewArea);
-  dom.previewContent.appendChild(editArea);
-
-  // Edit button in header
-  dom.previewEdit.classList.remove('hidden');
 
   const enterEdit = () => {
     viewArea.classList.add('hidden');
@@ -1156,18 +1277,19 @@ async function renderTextPreview(url) {
     dom.previewEdit.classList.add('hidden');
   };
 
+  const exitEdit = () => {
+    editArea.classList.add('hidden');
+    viewArea.classList.remove('hidden');
+    dom.previewEdit.classList.remove('hidden');
+  };
+
   const saveEdit = async () => {
     saveBtn.disabled = true;
     saveBtn.textContent = '保存中...';
     try {
       const fp = getFilePath(state.previewFile);
       await apiSave(fp, textarea.value);
-      code.innerHTML = '';
-      textarea.value.split('\n').forEach((line) => {
-        const span = document.createElement('span');
-        span.textContent = line || '​';
-        code.appendChild(span);
-      });
+      onViewRefresh(textarea.value);
       showToast('文件已保存', 'success');
       exitEdit();
     } catch (err) {
@@ -1178,26 +1300,54 @@ async function renderTextPreview(url) {
     }
   };
 
-  const exitEdit = () => {
-    editArea.classList.add('hidden');
-    viewArea.classList.remove('hidden');
-    dom.previewEdit.classList.remove('hidden');
+  const bindEditButton = () => {
+    dom.previewEdit.replaceWith(dom.previewEdit.cloneNode(true));
+    dom.previewEdit = $('#preview-edit');
+    dom.previewEdit.addEventListener('click', enterEdit);
   };
 
-  dom.previewEdit.replaceWith(dom.previewEdit.cloneNode(true));
-  dom.previewEdit = $('#preview-edit');
-  dom.previewEdit.addEventListener('click', enterEdit);
   saveBtn.addEventListener('click', saveEdit);
   cancelBtn.addEventListener('click', exitEdit);
-
-  // Ctrl+S to save
   textarea.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      saveEdit();
-    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveEdit(); }
     if (e.key === 'Escape') exitEdit();
   });
+
+  return { editArea, bindEditButton };
+}
+
+async function renderTextPreview(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+
+  const viewArea = document.createElement('div');
+  viewArea.id = 'text-view';
+  const pre = document.createElement('pre');
+  pre.className = 'line-numbers';
+  const code = document.createElement('code');
+
+  const buildLines = (t) => {
+    code.innerHTML = '';
+    t.split('\n').forEach((line) => {
+      const span = document.createElement('span');
+      span.textContent = line || '​';
+      code.appendChild(span);
+    });
+  };
+  buildLines(text);
+  pre.appendChild(code);
+  viewArea.appendChild(pre);
+
+  const { editArea, bindEditButton } = createTextEditor(text, viewArea, (newText) => {
+    buildLines(newText);
+  });
+
+  dom.previewContent.innerHTML = '';
+  dom.previewContent.appendChild(viewArea);
+  dom.previewContent.appendChild(editArea);
+  dom.previewEdit.classList.remove('hidden');
+  bindEditButton();
 }
 
 async function renderMarkdownPreview(url) {
@@ -1205,7 +1355,6 @@ async function renderMarkdownPreview(url) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
 
-  // Rendered view
   const viewArea = document.createElement('div');
   viewArea.id = 'text-view';
   const mdContent = document.createElement('div');
@@ -1213,78 +1362,15 @@ async function renderMarkdownPreview(url) {
   mdContent.innerHTML = marked.parse(text);
   viewArea.appendChild(mdContent);
 
-  // Edit mode (same as text preview)
-  const editArea = document.createElement('div');
-  editArea.id = 'text-edit';
-  editArea.className = 'hidden';
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'preview-edit-toolbar';
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'btn-primary';
-  saveBtn.textContent = '保存';
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'btn-secondary';
-  cancelBtn.textContent = '取消';
-  toolbar.appendChild(saveBtn);
-  toolbar.appendChild(cancelBtn);
-
-  const textarea = document.createElement('textarea');
-  textarea.className = 'preview-editor';
-  textarea.value = text;
-
-  editArea.appendChild(toolbar);
-  editArea.appendChild(textarea);
+  const { editArea, bindEditButton } = createTextEditor(text, viewArea, (newText) => {
+    mdContent.innerHTML = marked.parse(newText);
+  });
 
   dom.previewContent.innerHTML = '';
   dom.previewContent.appendChild(viewArea);
   dom.previewContent.appendChild(editArea);
-
   dom.previewEdit.classList.remove('hidden');
-
-  const enterEdit = () => {
-    viewArea.classList.add('hidden');
-    editArea.classList.remove('hidden');
-    textarea.focus();
-    dom.previewEdit.classList.add('hidden');
-  };
-
-  const saveEdit = async () => {
-    saveBtn.disabled = true;
-    saveBtn.textContent = '保存中...';
-    try {
-      const fp = getFilePath(state.previewFile);
-      await apiSave(fp, textarea.value);
-      mdContent.innerHTML = marked.parse(textarea.value);
-      showToast('文件已保存', 'success');
-      exitEdit();
-    } catch (err) {
-      showToast(`保存失败: ${err.message}`, 'error');
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = '保存';
-    }
-  };
-
-  const exitEdit = () => {
-    editArea.classList.add('hidden');
-    viewArea.classList.remove('hidden');
-    dom.previewEdit.classList.remove('hidden');
-  };
-
-  dom.previewEdit.replaceWith(dom.previewEdit.cloneNode(true));
-  dom.previewEdit = $('#preview-edit');
-  dom.previewEdit.addEventListener('click', enterEdit);
-  saveBtn.addEventListener('click', saveEdit);
-  cancelBtn.addEventListener('click', exitEdit);
-
-  textarea.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      saveEdit();
-    }
-    if (e.key === 'Escape') exitEdit();
-  });
+  bindEditButton();
 }
 
 function renderPdfPreview(url) {
@@ -1312,6 +1398,31 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') { e.preventDefault(); navigateImage(1); return; }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); dom.previewRotate.click(); return; }
   }
+
+  // Delete key: delete selected files with confirmation
+  if (e.key === 'Delete' && state.selected.size > 0) {
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (!dom.dialogOverlay.classList.contains('hidden')) return;
+    e.preventDefault();
+    const count = state.selected.size;
+    const label = count === 1
+      ? `确定删除 "${[...state.selected][0].split('/').pop()}"？此操作不可撤销。`
+      : `确定删除选中的 ${count} 个项目？此操作不可撤销。`;
+    openDialog('delete', label, '', async () => {
+      const paths = [...state.selected];
+      let ok = 0;
+      for (const p of paths) {
+        try { await apiDelete(p); ok++; }
+        catch (err) { showToast(`删除失败: ${escapeHtml(p)} - ${err.message}`, 'error'); }
+      }
+      if (ok > 0) showToast(`已删除 ${ok}/${paths.length} 项`, 'success');
+      clearSelection();
+      refreshCurrent(true);
+    });
+    return;
+  }
+
   if (e.key !== 'Escape') return;
   if (!dom.contextMenu.classList.contains('hidden')) {
     hideContextMenu();
@@ -1477,11 +1588,7 @@ dom.settingsOverlay.addEventListener('click', (e) => {
   if (e.target === dom.settingsOverlay) closeSettings();
 });
 // === Refresh ===
-dom.refreshBtn.addEventListener('click', () => {
-  state.treeNodes = {};
-  renderTree();
-  navigateTo(state.currentPath);
-});
+dom.refreshBtn.addEventListener('click', () => refreshCurrent(true));
 
 // === Sidebar Toggle (Mobile) ===
 function openSidebar() {
@@ -1508,16 +1615,25 @@ dom.selectRect = document.createElement('div');
 dom.selectRect.className = 'select-rect hidden';
 document.body.appendChild(dom.selectRect);
 
+// Drag count label inside the rectangle
+const _dragCountLabel = document.createElement('div');
+_dragCountLabel.className = 'select-rect-count hidden';
+dom.selectRect.appendChild(_dragCountLabel);
+
 let dragState = null;
+let _dragJustEnded = false; // flag to suppress click after drag
 
 dom.fileList.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
+  // Don't start drag on cards (card click handles itself), placeholder areas, or scrollbar
+  if (e.target.closest('.file-card')) return;
   if (e.target.closest('.empty-placeholder') || e.target.closest('.loading-placeholder') || e.target.closest('.error-placeholder')) return;
 
   dragState = {
     startX: e.clientX,
     startY: e.clientY,
     started: false,
+    prevSelected: new Set(), // track cards we've already toggled during this drag
   };
 });
 
@@ -1527,11 +1643,12 @@ document.addEventListener('mousemove', (e) => {
   const dx = Math.abs(e.clientX - dragState.startX);
   const dy = Math.abs(e.clientY - dragState.startY);
 
-  if (!dragState.started && (dx > 3 || dy > 3)) {
-    // Threshold exceeded: activate drag mode
+  if (!dragState.started && (dx > 5 || dy > 5)) {
     dragState.started = true;
+    // Ctrl/Cmd: keep existing selection and add to it
     if (!e.ctrlKey && !e.metaKey) clearSelection();
     dom.selectRect.classList.remove('hidden');
+    _dragCountLabel.classList.remove('hidden');
     document.body.style.userSelect = 'none';
   }
 
@@ -1544,42 +1661,75 @@ document.addEventListener('mousemove', (e) => {
     dom.selectRect.style.top = top + 'px';
     dom.selectRect.style.width = width + 'px';
     dom.selectRect.style.height = height + 'px';
-  }
-});
 
-document.addEventListener('mouseup', (e) => {
-  if (!dragState) return;
-
-  if (dragState.started) {
+    // Real-time card highlighting
     const selRect = dom.selectRect.getBoundingClientRect();
-    dom.selectRect.classList.add('hidden');
-    document.body.style.userSelect = '';
-    const cards = dom.fileList.querySelectorAll('.file-card');
+    const currentInRect = new Set();
 
-    cards.forEach((card) => {
+    dom.fileList.querySelectorAll('.file-card').forEach((card) => {
       const cardRect = card.getBoundingClientRect();
-      if (cardRect.left < selRect.right &&
-          cardRect.right > selRect.left &&
-          cardRect.top < selRect.bottom &&
-          cardRect.bottom > selRect.top) {
-        const nameEl = card.querySelector('.file-card-name');
-        if (!nameEl) return;
-        const entry = state.entries.find(en => en.name === nameEl.textContent);
-        if (!entry) return;
-        const p = getFilePath(entry);
-        state.selected.add(p);
-        card.classList.add('selected');
+      const inRect = cardRect.left < selRect.right &&
+        cardRect.right > selRect.left &&
+        cardRect.top < selRect.bottom &&
+        cardRect.bottom > selRect.top;
+      const p = card.dataset.entryPath;
+      if (!p) return;
+
+      if (inRect) {
+        currentInRect.add(p);
+        if (!dragState.prevSelected.has(p)) {
+          // Just entered the rect → toggle
+          if (e.ctrlKey || e.metaKey) {
+            toggleSelect(p, card);
+          } else {
+            state.selected.add(p);
+            card.classList.add('selected');
+          }
+          dragState.prevSelected.add(p);
+        }
+      } else {
+        if (dragState.prevSelected.has(p)) {
+          // Just left the rect → undo toggle
+          if (e.ctrlKey || e.metaKey) {
+            toggleSelect(p, card);
+          } else {
+            state.selected.delete(p);
+            card.classList.remove('selected');
+          }
+          dragState.prevSelected.delete(p);
+        }
       }
     });
 
+    // Update count label
+    _dragCountLabel.textContent = dragState.prevSelected.size;
+    _dragCountLabel.style.left = (width < 70 ? -30 : width / 2 - 12) + 'px';
+    _dragCountLabel.style.top = height + 8 + 'px';
+
     updateBatchBar();
   }
-  // If drag never started, it was a click on empty area → clear selection
-  if (!dragState.started && !e.target.closest('.file-card') && !e.ctrlKey) {
-    clearSelection();
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragState) return;
+
+  if (dragState.started) {
+    dom.selectRect.classList.add('hidden');
+    _dragCountLabel.classList.add('hidden');
+    document.body.style.userSelect = '';
+    _dragJustEnded = true;
+    setTimeout(() => { _dragJustEnded = false; }, 50);
   }
 
   dragState = null;
+});
+
+// Click on empty area of file list → clear selection
+dom.fileList.addEventListener('click', (e) => {
+  if (!e.target.closest('.file-card') && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    clearSelection();
+    state._lastClicked = null;
+  }
 });
 
 // === Multi-Select ===
@@ -1594,13 +1744,32 @@ function toggleSelect(entryPath, card) {
   updateBatchBar();
 }
 
+function selectRange(fromPath, toPath) {
+  // Find indices of from and to in sorted entries
+  const sorted = sortEntries([...state.entries]);
+  const fromIdx = sorted.findIndex(e => getFilePath(e) === fromPath);
+  const toIdx = sorted.findIndex(e => getFilePath(e) === toPath);
+  if (fromIdx < 0 || toIdx < 0) return;
+
+  const lo = Math.min(fromIdx, toIdx);
+  const hi = Math.max(fromIdx, toIdx);
+  for (let i = lo; i <= hi; i++) {
+    const p = getFilePath(sorted[i]);
+    state.selected.add(p);
+  }
+  // Update DOM for all visible cards
+  dom.fileList.querySelectorAll('.file-card').forEach((card) => {
+    const p = card.dataset.entryPath;
+    if (p && state.selected.has(p)) card.classList.add('selected');
+  });
+  state._lastClicked = toPath;
+  updateBatchBar();
+}
+
 function updateAllCardSelections() {
   dom.fileList.querySelectorAll('.file-card').forEach((card) => {
-    const nameEl = card.querySelector('.file-card-name');
-    if (!nameEl) return;
-    const entry = state.entries.find(e => e.name === nameEl.textContent);
-    if (!entry) return;
-    const p = getFilePath(entry);
+    const p = card.dataset.entryPath;
+    if (!p) return;
     card.classList.toggle('selected', state.selected.has(p));
   });
 }
@@ -1617,6 +1786,7 @@ function updateBatchBar() {
 
 function clearSelection() {
   state.selected.clear();
+  state._lastClicked = null;
   dom.fileList.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
   updateBatchBar();
 }
@@ -1639,7 +1809,7 @@ dom.batchDeleteBtn.addEventListener('click', () => {
     }
     showToast(`已删除 ${ok}/${paths.length} 项`, 'success');
     clearSelection();
-    refreshCurrent();
+    refreshCurrent(true);
   });
 });
 
@@ -1785,7 +1955,7 @@ dom.batchRenameConfirm.addEventListener('click', async () => {
   if (results.fail > 0) showToast(`${results.fail} 项重命名失败`, 'error');
   closeBatchRename();
   clearSelection();
-  refreshCurrent();
+  refreshCurrent(true);
 });
 
 // === Utility ===
@@ -1828,7 +1998,7 @@ dom.ctxRename.addEventListener('click', () => {
     const fp = getFilePath(entry);
     await apiRename(fp, newName);
     showToast(`已重命名为 "${newName}"`, 'success');
-    refreshCurrent();
+    refreshCurrent(true);
   });
 });
 
@@ -1855,7 +2025,7 @@ dom.ctxDelete.addEventListener('click', () => {
     const fp = getFilePath(entry);
     await apiDelete(fp);
     showToast(`已删除 "${entry.name}"`, 'success');
-    refreshCurrent();
+    refreshCurrent(true);
   });
 });
 
@@ -2064,7 +2234,7 @@ dom.moveConfirm.addEventListener('click', async () => {
     dom.moveConfirm.disabled = false;
     closeMoveDialog();
     clearSelection();
-    refreshCurrent();
+    refreshCurrent(true);
     return;
   }
 
@@ -2080,7 +2250,7 @@ dom.moveConfirm.addEventListener('click', async () => {
     await apiMove(sourcePath, moveTargetDir);
     showToast(`已移动到 /${moveTargetDir || ''}`, 'success');
     closeMoveDialog();
-    refreshCurrent();
+    refreshCurrent(true);
   } catch (err) {
     dom.moveError.textContent = err.message;
   } finally {
@@ -2110,7 +2280,7 @@ dom.uploadInput.addEventListener('change', async () => {
     let msg = `上传完成: ${ok} 个成功`;
     if (fail > 0) msg += `, ${fail} 个失败`;
     showToast(msg, fail > 0 ? 'error' : 'success');
-    refreshCurrent();
+    refreshCurrent(true);
   } catch (err) {
     showToast(`上传失败: ${err.message}`, 'error');
   } finally {
@@ -2125,15 +2295,19 @@ dom.newFolderBtn.addEventListener('click', () => {
   openDialog('newfolder', '新建文件夹', '', async (name) => {
     await apiMkdir(state.currentPath || '', name);
     showToast(`已创建文件夹 "${name}"`, 'success');
-    refreshCurrent();
+    refreshCurrent(true);
   });
 });
 
 // === Refresh Helper ===
-async function refreshCurrent() {
+async function refreshCurrent(silent = false) {
+  const scrollTop = silent ? dom.fileList.scrollTop : 0;
   state.treeNodes = {};
   renderTree();
   await navigateTo(state.currentPath);
+  if (silent) {
+    dom.fileList.scrollTop = scrollTop;
+  }
 }
 
 // === Init ===
@@ -2153,6 +2327,8 @@ async function init() {
   renderTree();
   renderBreadcrumb();
 
+  setupDropZones();
+
   if (initialPath) {
     await navigateTo(initialPath);
   } else {
@@ -2161,6 +2337,54 @@ async function init() {
     const fileCount = state.entries.length - folderCount;
     dom.itemCount.textContent = `${folderCount} 个文件夹, ${fileCount} 个文件`;
   }
+
+  connectWs();
+}
+
+// === WebSocket directory watch ===
+let _ws = null;
+let _wsReconnectTimer = null;
+let _lastWsRefresh = 0;
+
+function connectWs() {
+  if (_ws) { _ws.close(); _ws = null; }
+  clearTimeout(_wsReconnectTimer);
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  _ws = new WebSocket(`${proto}://${location.host}`);
+
+  _ws.onopen = () => {
+    console.log('[ws] connected');
+  };
+
+  _ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'change') {
+        // Invalidate tree cache for changed dir
+        if (state.treeNodes[msg.path]) {
+          state.treeNodes[msg.path].loaded = false;
+        }
+        // Only refresh if change is in current directory itself (not a parent, not just root blips)
+        const isCurrent = msg.path === state.currentPath;
+        if (!isCurrent && msg.path !== '' && !state.currentPath.startsWith(msg.path + '/')) return;
+        // Cooldown: don't refresh more than once every 3 seconds from WS events
+        const now = Date.now();
+        if (now - _lastWsRefresh < 3000) return;
+        _lastWsRefresh = now;
+        refreshCurrent(true);
+      }
+    } catch (_) {}
+  };
+
+  _ws.onclose = () => {
+    console.log('[ws] disconnected, reconnecting in 5s...');
+    _wsReconnectTimer = setTimeout(connectWs, 5000);
+  };
+
+  _ws.onerror = () => {
+    _ws.close();
+  };
 }
 
 init();
