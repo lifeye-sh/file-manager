@@ -1,10 +1,32 @@
+<<<<<<< HEAD
 # Web 文件管理器
 
 基于 Node.js + Express 的 Web 文件管理器，支持目录浏览、文件预览、多媒体播放、缩略图生成、上传下载、增删改查，并内置用户认证与访问控制。可通过 frp 实现内网穿透，从外网安全访问本地文件。
+=======
+# File Manager
+
+基于 Web 的文件管理器，Liquid Glass 深色主题，支持多级目录浏览、缩略图网格、多媒体预览、拖拽移动、WebSocket 实时推送。
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
 
 ---
 
+<<<<<<< HEAD
 ## 目录
+=======
+- **玻璃质感 UI** — iOS 26 Liquid Glass 设计风格，纯黑深色系，backdrop-filter 毛玻璃效果，响应式布局
+- **多级目录树** — 懒加载树与文件网格联动，面包屑导航 + Hash 路由支持浏览器前进后退
+- **缩略图网格** — 图片服务端生成 256px WebP 缩略图并缓存，视频自动提取封面帧
+- **懒加载** — 首屏 60 张卡片，滚动到接近底部自动加载下一批，IntersectionObserver 监测
+- **图片全屏** — ← → 翻看目录内所有图片，滚轮缩放/拖拽平移，R 键旋转，双击还原
+- **多媒体预览** — 视频、音频、文本（可编辑保存）、Markdown、PDF 在线预览
+- **文件操作** — 新建文件夹、重命名、删除、移动、上传、批量重命名/移动/删除
+- **拖拽移动** — 单文件或多选文件拖到文件夹或面包屑上直接移动
+- **键盘操作** — Delete 键删除选中文件（带确认弹窗）、Shift+Click 范围选择、Ctrl+Click 多选、拖拽框选
+- **实时推送** — WebSocket 监听目录变更，自动刷新当前视图
+- **在线设置** — 根目录、端口、绑定地址、IP 白名单均可通过 Web 页面修改
+- **配置加密** — config.json 使用 AES-256-GCM 加密存储（config.json.enc）
+- **安全控制** — IP 白名单支持 CIDR，多地址绑定
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
 
 1. [功能特性](#功能特性)
 2. [技术栈](#技术栈)
@@ -112,6 +134,7 @@ http://localhost:3000
 http://127.0.0.1:3000
 ```
 
+<<<<<<< HEAD
 用用户名 `yuming` 和临时密码登录，首次登录建议立即修改密码。
 
 ### 4. 指定根目录与端口
@@ -127,10 +150,27 @@ node server.js --root="D:\MyFiles" --port=8080
 ## 配置说明
 
 `config.json` 示例：
+=======
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--root` | 管理的根目录路径 | config 或当前目录 |
+| `--port` | 服务端口 | config 或 3000 |
+| `--bind` | 绑定地址，多个用逗号分隔 | config 或 0.0.0.0 |
+
+优先级：命令行参数 > config.json.enc > 默认值
+
+## 配置文件
+
+配置通过 AES-256-GCM 加密存储为 `config.json.enc`，密钥由本机 hostname 派生，仅本机可解密。
+
+首次运行时若存在旧版 `config.json` 明文文件，会自动读取并迁移为加密格式。
+
+可通过 Web 设置页修改（齿轮图标）。
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
 
 ```json
 {
-  "root": "E:\\AIHuman",
+  "root": "E:\\Files",
   "port": 3000,
   "bind": ["0.0.0.0"],
   "whitelist": [],
@@ -188,6 +228,7 @@ node add-user.js bob  MyP@ssw0rd        # 普通用户
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+<<<<<<< HEAD
 | GET | `/api/csrf-token` | 获取 CSRF token（登录页自动调用） |
 | POST | `/api/auth/login` | 登录 |
 | POST | `/api/auth/logout` | 登出 |
@@ -196,9 +237,24 @@ node add-user.js bob  MyP@ssw0rd        # 普通用户
 | POST | `/api/auth/add-user` | 添加用户（admin） |
 | POST | `/api/auth/delete-user` | 删除用户（admin） |
 | POST | `/api/auth/change-password` | 修改密码 |
+=======
+| GET | `/api/browse?path=<path>` | 列出目录内容 |
+| GET | `/api/file?path=<path>` | 获取文件（支持 Range 请求） |
+| GET | `/api/thumb?path=<path>` | 获取图片缩略图（256px WebP，自动缓存） |
+| POST | `/api/mkdir` | 创建文件夹 |
+| POST | `/api/rename` | 重命名 |
+| POST | `/api/delete` | 删除文件/文件夹 |
+| POST | `/api/move` | 移动文件/文件夹 |
+| POST | `/api/save` | 保存文本文件内容 |
+| POST | `/api/upload` | 上传文件（multipart） |
+| GET | `/api/config` | 获取配置（不含密钥） |
+| POST | `/api/config` | 更新配置 |
+| WS | `/` | WebSocket 目录变更推送 |
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
 
 ### 文件操作
 
+<<<<<<< HEAD
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/browse?path=` | 浏览目录 |
@@ -279,6 +335,15 @@ node add-user.js bob  MyP@ssw0rd        # 普通用户
 - 检查 `.thumbcache` 目录是否有写入权限。
 
 ---
+=======
+| 类型 | 扩展名 | 预览方式 |
+|------|--------|----------|
+| 图片 | jpg, png, gif, webp, bmp | 全屏浏览 + 翻页 + 旋转 + 缩略图 |
+| 视频 | mp4, webm, ogg, mov, avi, mkv | HTML5 播放器 + 封面帧 |
+| 音频 | mp3, wav, flac, aac, m4a, opus | HTML5 播放器 |
+| 文本 | txt, md, json, js, py, html, css 等 | 行号代码查看 + 在线编辑 |
+| PDF | pdf | PDF.js 在线查看 |
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
 
 ## 快捷键
 
@@ -286,14 +351,50 @@ node add-user.js bob  MyP@ssw0rd        # 普通用户
 |--------|------|
 | ← → | 全屏浏览时切换上/下一张图片 |
 | R | 全屏浏览时旋转图片 90° |
+| Delete | 删除选中文件（弹窗确认） |
 | Esc | 关闭当前弹窗/菜单 |
 | Ctrl+S | 文本编辑时保存 |
+<<<<<<< HEAD
 | Ctrl+Click | 多选文件 |
 | 双击 | 打开文件夹 / 预览文件 / 还原图片缩放 |
 | 滚轮 | 全屏浏览时缩放图片 |
+=======
+| Ctrl+Click | 多选/取消选中文件 |
+| Shift+Click | 范围选择（从上次点击到当前项） |
+| 拖拽框选 | 鼠标拖拽矩形区域批量选中 |
+| 拖拽到文件夹 | 移动文件到目标文件夹 |
+| 双击 | 打开文件夹 / 预览文件 / 还原图片缩放 |
+| 滚轮 | 全屏浏览时缩放图片 |
+| 长按 | 触屏设备弹出右键菜单 |
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
 
 ---
 
+<<<<<<< HEAD
 ## 许可证
 
 本项目为内部使用工具，未指定开源许可证。
+=======
+```
+file-manager/
+├── server.js              # 入口：HTTP 服务 + WebSocket
+├── package.json
+├── .thumbcache/           # 缩略图缓存（256px WebP）
+├── config.json.enc       # 加密配置
+├── README.md
+├── lib/
+│   ├── config.js          # 配置加载/加密存储
+│   ├── whitelist.js       # IP 白名单 + CIDR
+│   ├── safePath.js        # 路径安全校验
+│   ├── thumbnail.js       # 缩略图生成（sharp）
+│   ├── mime.js            # MIME 类型映射
+│   ├── rateLimit.js       # 通用频率限制
+│   └── watcher.js         # fs.watch 目录监听
+├── routes/
+│   └── api.js             # 全部 API 路由
+└── public/
+    ├── index.html         # 前端页面
+    ├── style.css          # Liquid Glass 样式
+    └── app.js             # 前端逻辑
+```
+>>>>>>> 440a9f0e5da141be41771f6130e1c02d36a15ac1
