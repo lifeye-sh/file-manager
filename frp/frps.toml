@@ -1,0 +1,59 @@
+# ============================================================
+# frps.toml - frp 服务端配置 (v0.69+，部署在 Linux VPS 上)
+# ============================================================
+
+# --- 基础通信端口 ---
+# frpc 客户端与此端口建立连接
+bindPort = 7000
+
+# 可选：QUIC 协议端口（需要时取消注释）
+# quicBindPort = 7000
+
+# --- KCP 支持（需要时取消注释，低延迟但高丢包场景适用）---
+# kcpBindPort = 7000
+
+# --- 身份验证（强烈建议开启，防止未授权客户端连接）---
+[auth]
+method = "token"
+token = "9sK&7pR2!zT@5bQ#8dF$3gH%0jL^6nV&1cX"
+
+# --- HTTP 虚拟主机端口 ---
+# 外网用户通过 http://你的域名:8080 或 http://VPS_IP:8080 访问
+vhostHTTPPort = 8099
+
+# HTTPS 虚拟主机端口（需要 SSL 证书时取消注释）
+# vhostHTTPSPort = 8443
+
+# --- Web Dashboard（监控面板）---
+[webServer]
+addr = "0.0.0.0"
+port = 7500
+user = "yuming"
+password = "a1030293"
+# 可选：TLS 证书（生产环境建议开启）
+# tlsCertFile = "/path/to/cert.pem"
+# tlsKeyFile = "/path/to/key.pem"
+
+# --- 日志 ---
+[log]
+to = "./frps.log"
+level = "info"
+maxDays = 7
+
+# --- 带宽限制（可选，单位 MB/s）---
+# [transport]
+# tcpMux = true  # TCP 多路复用，减少连接数，建议开启
+
+# --- 端口白名单（可选，限制客户端可使用的远程端口范围）---
+# 取消注释以下内容来限制可用端口
+# [[allowPorts]]
+# start = 6000
+# end = 9000
+# [[allowPorts]]
+# single = 8080
+
+# --- TLS 加密传输（可选，高安全性场景）---
+# [transport.tls]
+# force = true
+# certFile = "/path/to/server.crt"
+# keyFile = "/path/to/server.key"

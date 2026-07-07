@@ -1,0 +1,80 @@
+# ============================================================
+# frpc.toml - frp 客户端配置 (v0.69+，部署在 Windows 内网机器上)
+# ============================================================
+
+# --- 连接到 frp 服务端 ---
+# 替换为你的 VPS 公网 IP 或域名
+serverAddr = "182.92.67.143"
+serverPort = 7000
+
+# --- 身份验证（必须与服务端一致）---
+[auth]
+method = "token"
+token = "9sK&7pR2!zT@5bQ#8dF$3gH%0jL^6nV&1cX"
+
+# --- 客户端管理界面（可选，方便在本机查看状态）---
+[webServer]
+addr = "127.0.0.1"
+port = 7400
+user = "yuming"
+password = "a1030293"
+
+# --- 日志 ---
+[log]
+to = "./frpc.log"
+level = "info"
+maxDays = 7
+
+# ============================================================
+# 代理配置：将本地 web 文件管理器暴露到公网
+# ============================================================
+
+# --- 方案 A: HTTP 代理（推荐，支持自定义域名）---
+# 外网访问方式：
+#   1. http://你的域名:8080 （需将域名解析到 VPS IP）
+#   2. http://VPS公网IP:8080
+[[proxies]]
+name = "file-manager-web"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 3000
+# 替换为你的域名（需 DNS 已指向 VPS IP）
+customDomains = ["请换成你的域名如 file.yourdomain.com"]
+
+# 可选：如果你有多个 web 服务，可使用 subdomain 方式
+# 外部访问：http://file.你的域名:8080
+# subdomain = "file"
+
+# 可选：获取真实用户 IP（在应用中通过 X-Forwarded-For / X-Real-IP 获取）
+[proxies.transport]
+proxyProtocolVersion = "v2"
+
+# --- 方案 B: TCP 直连（简单粗暴，不需要域名）---
+# 如果只想用 IP+端口直接访问，取消下面注释，并注释掉方案 A
+# 外网访问方式：http://VPS公网IP:6000
+# [[proxies]]
+# name = "file-manager-tcp"
+# type = "tcp"
+# localIP = "127.0.0.1"
+# localPort = 3000
+# remotePort = 6000
+
+# ============================================================
+# 其他示例（根据需要取消注释）
+# ============================================================
+
+# --- SSH 远程访问（如果需要远程管理内网机器）---
+# [[proxies]]
+# name = "ssh"
+# type = "tcp"
+# localIP = "127.0.0.1"
+# localPort = 22
+# remotePort = 6001
+
+# --- Windows RDP 远程桌面 ---
+# [[proxies]]
+# name = "rdp"
+# type = "tcp"
+# localIP = "127.0.0.1"
+# localPort = 3389
+# remotePort = 6002

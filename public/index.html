@@ -83,6 +83,8 @@
         <div class="preview-actions">
           <a id="preview-edit" class="btn-icon hidden" title="编辑">&#x270E;</a>
           <button id="preview-rotate" class="btn-icon hidden" title="旋转">&#x21bb;</button>
+          <button id="preview-autoplay" class="btn-icon hidden" title="自动播放">&#x25B6;</button>
+          <input type="number" id="autoplay-interval" class="autoplay-interval hidden" value="3" min="1" max="60" title="播放间隔(秒)">
           <a id="preview-download" class="btn-icon" title="下载" download>&#x2913;</a>
           <button id="preview-close" class="btn-icon" title="关闭">&times;</button>
         </div>
@@ -130,6 +132,37 @@
       <div class="settings-footer">
         <button id="settings-cancel" class="btn-secondary">取消</button>
         <button id="settings-save" class="btn-primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div id="password-overlay" class="preview-overlay hidden">
+    <div class="settings-modal">
+      <div class="settings-header">
+        <h3>修改密码</h3>
+        <button id="password-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-field" style="margin-bottom: 16px;">
+          <label for="password-current">当前密码</label>
+          <input type="password" id="password-current" class="settings-input" placeholder="请输入当前密码" autocomplete="current-password">
+          <span id="password-current-error" class="settings-error"></span>
+        </div>
+        <div class="settings-field" style="margin-bottom: 16px;">
+          <label for="password-new">新密码</label>
+          <input type="password" id="password-new" class="settings-input" placeholder="至少6位" autocomplete="new-password">
+          <span id="password-new-error" class="settings-error"></span>
+        </div>
+        <div class="settings-field">
+          <label for="password-confirm">确认新密码</label>
+          <input type="password" id="password-confirm" class="settings-input" placeholder="再次输入新密码" autocomplete="new-password">
+          <span id="password-confirm-error" class="settings-error"></span>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button id="password-cancel" class="btn-secondary">取消</button>
+        <button id="password-save" class="btn-primary">保存</button>
       </div>
     </div>
   </div>

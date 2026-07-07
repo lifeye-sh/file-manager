@@ -691,6 +691,25 @@ body {
 #preview-rotate { transition: color 0.15s; }
 #preview-rotate.rotated { color: var(--accent); }
 
+#preview-autoplay { transition: color 0.15s; }
+#preview-autoplay.active { color: var(--accent); }
+
+.autoplay-interval {
+  width: 42px;
+  height: 28px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+  text-align: center;
+  padding: 0 4px;
+  -moz-appearance: textfield;
+}
+.autoplay-interval::-webkit-inner-spin-button,
+.autoplay-interval::-webkit-outer-spin-button { opacity: 1; }
+.autoplay-interval.hidden { display: none; }
+
 .image-nav-prev { left: 8px; }
 .image-nav-next { right: 8px; }
 

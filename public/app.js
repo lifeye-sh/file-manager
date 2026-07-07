@@ -7,7 +7,88 @@ const state = {
   previewFile: null,
   selected: new Set(),      // Set of entry paths for multi-select
   sortKey: 'default',       // sort dropdown value
+  user: null,               // { username, isAdmin }
 };
+
+// === Auth Helpers ===
+let _csrfToken = '';
+
+async function fetchCsrfToken() {
+  try {
+    const res = await _origFetch('/api/csrf-token', { credentials: 'same-origin' });
+    if (res.ok) {
+      const data = await res.json();
+      _csrfToken = data.token;
+      return data.token;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function checkAuth() {
+  try {
+    const res = await _origFetch('/api/auth/session', { credentials: 'same-origin' });
+    if (res.ok) {
+      const data = await res.json();
+      state.user = data;
+      // Fetch CSRF token once authenticated
+      await fetchCsrfToken();
+      return true;
+    }
+  } catch (_) {}
+  state.user = null;
+  return false;
+}
+
+function redirectToLogin() {
+  window.location.href = '/login.html';
+}
+
+async function doLogout() {
+  try {
+    const headers = {};
+    if (_csrfToken) headers['X-CSRF-Token'] = _csrfToken;
+    await _origFetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers });
+  } catch (_) {}
+  redirectToLogin();
+}
+
+// Save original fetch before wrapping
+const _origFetch = window.fetch;
+
+// Auth-aware fetch: CSRF token + auto-redirect on 401 + refresh CSRF on 403 retry once
+function authFetch(url, options = {}) {
+  return doAuthFetch(url, options, false);
+}
+
+async function doAuthFetch(url, options = {}, isRetry) {
+  const method = (options.method || 'GET').toUpperCase();
+  const opts = { ...options, credentials: options.credentials || 'same-origin' };
+
+  // Attach CSRF token to state-changing requests
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    opts.headers = new Headers(opts.headers || {});
+    if (_csrfToken) opts.headers.set('X-CSRF-Token', _csrfToken);
+  }
+
+  const res = await _origFetch(url, opts);
+
+  if (res.status === 401) {
+    try {
+      const data = await res.clone().json();
+      if (data.code === 'UNAUTHORIZED') redirectToLogin();
+    } catch (_) {}
+    return res;
+  }
+
+  // CSRF token probably expired; refresh once and retry
+  if (res.status === 403 && !isRetry && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const newToken = await fetchCsrfToken();
+    if (newToken) return doAuthFetch(url, options, true);
+  }
+
+  return res;
+}
 
 // === DOM References ===
 const $ = (sel) => document.querySelector(sel);
@@ -37,6 +118,8 @@ const dom = {
   imageNavNext: $('#image-nav-next'),
   imageCounter: $('#image-counter'),
   previewRotate: $('#preview-rotate'),
+  previewAutoPlay: $('#preview-autoplay'),
+  autoplayInterval: $('#autoplay-interval'),
   toastContainer: $('#toast-container'),
   settingsOverlay: $('#settings-overlay'),
   settingsRoot: $('#settings-root'),
@@ -50,6 +133,17 @@ const dom = {
   settingsSave: $('#settings-save'),
   settingsCancel: $('#settings-cancel'),
   settingsClose: $('#settings-close'),
+  // Change password
+  passwordOverlay: $('#password-overlay'),
+  passwordCurrent: $('#password-current'),
+  passwordNew: $('#password-new'),
+  passwordConfirm: $('#password-confirm'),
+  passwordCurrentError: $('#password-current-error'),
+  passwordNewError: $('#password-new-error'),
+  passwordConfirmError: $('#password-confirm-error'),
+  passwordSave: $('#password-save'),
+  passwordCancel: $('#password-cancel'),
+  passwordClose: $('#password-close'),
   // File operations
   contextMenu: $('#context-menu'),
   ctxRename: $('#ctx-rename'),
@@ -143,7 +237,7 @@ function showToast(message, type = 'error') {
 
 // === API Calls ===
 async function apiBrowse(path) {
-  const res = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+  const res = await authFetch(`/api/browse?path=${encodeURIComponent(path)}`);
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const err = new Error(data.error || `HTTP ${res.status}`);
@@ -167,7 +261,7 @@ function getThumbUrl(entry) {
 
 // === File Operations API ===
 async function apiMkdir(parentPath, name) {
-  const res = await fetch('/api/mkdir', {
+  const res = await authFetch('/api/mkdir', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: parentPath, name }),
@@ -180,7 +274,7 @@ async function apiMkdir(parentPath, name) {
 }
 
 async function apiRename(targetPath, newName) {
-  const res = await fetch('/api/rename', {
+  const res = await authFetch('/api/rename', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: targetPath, newName }),
@@ -193,7 +287,7 @@ async function apiRename(targetPath, newName) {
 }
 
 async function apiDelete(targetPath) {
-  const res = await fetch('/api/delete', {
+  const res = await authFetch('/api/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: targetPath }),
@@ -206,7 +300,7 @@ async function apiDelete(targetPath) {
 }
 
 async function apiMove(sourcePath, targetDir) {
-  const res = await fetch('/api/move', {
+  const res = await authFetch('/api/move', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: sourcePath, targetDir }),
@@ -219,7 +313,7 @@ async function apiMove(sourcePath, targetDir) {
 }
 
 async function apiUpload(formData) {
-  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+  const res = await authFetch('/api/upload', { method: 'POST', body: formData });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || `HTTP ${res.status}`);
@@ -228,7 +322,7 @@ async function apiUpload(formData) {
 }
 
 async function apiSave(filePath, content) {
-  const res = await fetch('/api/save', {
+  const res = await authFetch('/api/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: filePath, content }),
@@ -238,6 +332,22 @@ async function apiSave(filePath, content) {
     throw new Error(data.error || `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+async function apiChangePassword(currentPassword, newPassword) {
+  const res = await authFetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let data = {};
+    try { data = JSON.parse(text); } catch (_) {}
+    const error = data.error || (res.status === 401 ? '登录已过期，请重新登录' : `请求失败 (${res.status})`);
+    throw new Error(error);
+  }
+  return res.json().catch(() => ({}));
 }
 
 // === Breadcrumb ===
@@ -291,6 +401,7 @@ function renderFileList(entries) {
   const fileCount = entries.length - folderCount;
   dom.itemCount.textContent = `${folderCount} 个文件夹, ${fileCount} 个文件`;
 
+  const frag = document.createDocumentFragment();
   entries.forEach((entry) => {
     const card = document.createElement('div');
     card.className = 'file-card';
@@ -404,8 +515,10 @@ function renderFileList(entries) {
     card.addEventListener('touchend', () => { clearTimeout(longPressTimer); longPressTimer = null; });
     card.addEventListener('touchcancel', () => { clearTimeout(longPressTimer); longPressTimer = null; });
 
-    dom.fileList.appendChild(card);
+    frag.appendChild(card);
   });
+
+  dom.fileList.appendChild(frag);
 
   updateBatchBar();
 
@@ -880,6 +993,7 @@ async function openPreview(entry) {
 }
 
 function closePreview() {
+  stopAutoPlay();
   dom.previewOverlay.classList.add('hidden');
   dom.previewContainer.classList.remove('image-fullscreen');
   dom.previewContent.innerHTML = '';
@@ -887,10 +1001,13 @@ function closePreview() {
   state.previewFile = null;
   if (state._imageNav) {
     if (state._imageNav.onResize) window.removeEventListener('resize', state._imageNav.onResize);
+    if (state._imageNav.cleanup) state._imageNav.cleanup();
     state._imageNav = null;
   }
   dom.previewEdit.classList.add('hidden');
   dom.previewRotate.classList.add('hidden');
+  dom.previewAutoPlay.classList.add('hidden');
+  dom.autoplayInterval.classList.add('hidden');
   dom.imageNavPrev.classList.add('hidden');
   dom.imageNavNext.classList.add('hidden');
   dom.imageCounter.classList.add('hidden');
@@ -961,7 +1078,7 @@ function renderImagePreview(entry) {
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', (e) => {
+  const onMouseMove = (e) => {
     if (!dragging || !state.previewFile) return;
     posX += e.clientX - lastX;
     posY += e.clientY - lastY;
@@ -969,15 +1086,18 @@ function renderImagePreview(entry) {
     lastY = e.clientY;
     img.style.transition = 'none';
     updateTransform();
-  });
+  };
 
-  document.addEventListener('mouseup', () => {
+  const onMouseUp = () => {
     if (dragging) {
       dragging = false;
       wrapper.style.cursor = scale > baseScale ? 'grab' : 'default';
       img.style.transition = 'transform 0.1s ease';
     }
-  });
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
 
   wrapper.addEventListener('dblclick', () => {
     fitToScreen();
@@ -1017,6 +1137,8 @@ function renderImagePreview(entry) {
   dom.previewEdit.classList.add('hidden');
   dom.previewRotate.classList.remove('hidden');
   dom.previewRotate.classList.remove('rotated');
+  dom.previewAutoPlay.classList.remove('hidden');
+  dom.autoplayInterval.classList.remove('hidden');
 
   dom.previewContent.innerHTML = '';
   dom.previewContent.appendChild(wrapper);
@@ -1044,17 +1166,60 @@ function renderImagePreview(entry) {
   };
 
   // --- Keyboard navigation ---
-  state._imageNav = { showImage, imageList, index: currentIndex, onResize };
+  state._imageNav = {
+    showImage,
+    imageList,
+    index: currentIndex,
+    onResize,
+    cleanup: () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    },
+  };
 }
 
 function navigateImage(direction) {
   if (!state._imageNav || !state._imageNav.imageList.length) return;
+  stopAutoPlay();
   const { showImage, imageList } = state._imageNav;
   let idx = state._imageNav.index + direction;
   if (idx < 0) idx = imageList.length - 1;
   if (idx >= imageList.length) idx = 0;
   state._imageNav.index = idx;
   showImage(idx);
+}
+
+function startAutoPlay() {
+  if (!state._imageNav) return;
+  stopAutoPlay();
+  const seconds = Math.max(1, parseInt(dom.autoplayInterval.value) || 3);
+  dom.autoplayInterval.value = seconds;
+  state._imageNav._autoplayTimer = setInterval(() => {
+    if (!state._imageNav || !state._imageNav.imageList.length) { stopAutoPlay(); return; }
+    let idx = state._imageNav.index + 1;
+    if (idx >= state._imageNav.imageList.length) idx = 0;
+    state._imageNav.index = idx;
+    state._imageNav.showImage(idx);
+  }, seconds * 1000);
+  dom.previewAutoPlay.textContent = '⏸'; // pause icon
+  dom.previewAutoPlay.classList.add('active');
+}
+
+function stopAutoPlay() {
+  if (state._imageNav && state._imageNav._autoplayTimer) {
+    clearInterval(state._imageNav._autoplayTimer);
+    state._imageNav._autoplayTimer = null;
+  }
+  dom.previewAutoPlay.textContent = '▶'; // play icon
+  dom.previewAutoPlay.classList.remove('active');
+}
+
+function toggleAutoPlay() {
+  if (state._imageNav && state._imageNav._autoplayTimer) {
+    stopAutoPlay();
+  } else {
+    startAutoPlay();
+  }
 }
 
 function renderVideoPreview(url) {
@@ -1098,7 +1263,7 @@ function renderAudioPreview(url, name) {
 }
 
 async function renderTextPreview(url) {
-  const res = await fetch(url);
+  const res = await authFetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
 
@@ -1201,7 +1366,7 @@ async function renderTextPreview(url) {
 }
 
 async function renderMarkdownPreview(url) {
-  const res = await fetch(url);
+  const res = await authFetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
 
@@ -1303,6 +1468,12 @@ dom.previewOverlay.addEventListener('click', (e) => {
 dom.previewClose.addEventListener('click', closePreview);
 dom.imageNavPrev.addEventListener('click', () => navigateImage(-1));
 dom.imageNavNext.addEventListener('click', () => navigateImage(1));
+dom.previewAutoPlay.addEventListener('click', toggleAutoPlay);
+dom.autoplayInterval.addEventListener('change', () => {
+  if (state._imageNav && state._imageNav._autoplayTimer) {
+    startAutoPlay();
+  }
+});
 
 // Close overlays on Escape key (priority: context menu > dialog > move > preview > settings)
 document.addEventListener('keydown', (e) => {
@@ -1311,6 +1482,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); navigateImage(-1); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); navigateImage(1); return; }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); dom.previewRotate.click(); return; }
+    if (e.key === ' ') { e.preventDefault(); toggleAutoPlay(); return; }
   }
   if (e.key !== 'Escape') return;
   if (!dom.contextMenu.classList.contains('hidden')) {
@@ -1352,13 +1524,13 @@ window.addEventListener('hashchange', () => {
 
 // === Settings ===
 async function apiGetConfig() {
-  const res = await fetch('/api/config');
+  const res = await authFetch('/api/config');
   if (!res.ok) throw new Error('获取配置失败');
   return res.json();
 }
 
 async function apiSaveConfig(config) {
-  const res = await fetch('/api/config', {
+  const res = await authFetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
@@ -1476,6 +1648,92 @@ dom.settingsSave.addEventListener('click', saveSettings);
 dom.settingsOverlay.addEventListener('click', (e) => {
   if (e.target === dom.settingsOverlay) closeSettings();
 });
+
+// === Change Password ===
+function openChangePassword() {
+  dom.passwordCurrent.value = '';
+  dom.passwordNew.value = '';
+  dom.passwordConfirm.value = '';
+  dom.passwordCurrentError.textContent = '';
+  dom.passwordNewError.textContent = '';
+  dom.passwordConfirmError.textContent = '';
+  [dom.passwordCurrent, dom.passwordNew, dom.passwordConfirm].forEach(el => el.classList.remove('input-error'));
+  dom.passwordOverlay.classList.remove('hidden');
+  setTimeout(() => dom.passwordCurrent.focus(), 50);
+}
+
+function closeChangePassword() {
+  dom.passwordOverlay.classList.add('hidden');
+}
+
+async function saveChangePassword() {
+  const current = dom.passwordCurrent.value;
+  const newPwd = dom.passwordNew.value;
+  const confirm = dom.passwordConfirm.value;
+
+  dom.passwordCurrentError.textContent = '';
+  dom.passwordNewError.textContent = '';
+  dom.passwordConfirmError.textContent = '';
+  [dom.passwordCurrent, dom.passwordNew, dom.passwordConfirm].forEach(el => el.classList.remove('input-error'));
+
+  let hasError = false;
+  if (!current) {
+    dom.passwordCurrentError.textContent = '请输入当前密码';
+    dom.passwordCurrent.classList.add('input-error');
+    hasError = true;
+  }
+  if (!newPwd || newPwd.length < 6) {
+    dom.passwordNewError.textContent = '新密码至少需要6位';
+    dom.passwordNew.classList.add('input-error');
+    hasError = true;
+  }
+  if (newPwd !== confirm) {
+    dom.passwordConfirmError.textContent = '两次输入的新密码不一致';
+    dom.passwordConfirm.classList.add('input-error');
+    hasError = true;
+  }
+  if (hasError) return;
+
+  dom.passwordSave.disabled = true;
+  dom.passwordSave.textContent = '保存中...';
+
+  try {
+    await apiChangePassword(current, newPwd);
+    closeChangePassword();
+    showToast('密码已修改，请使用新密码重新登录', 'success');
+    // Log out after a short delay so user can re-login with new password
+    setTimeout(() => doLogout(), 1500);
+  } catch (err) {
+    const msg = err.message || '修改失败';
+    if (msg.includes('当前密码') || msg.includes('旧密码') || msg.includes('错误')) {
+      dom.passwordCurrentError.textContent = msg;
+      dom.passwordCurrent.classList.add('input-error');
+    } else if (msg.includes('新密码') || msg.includes('至少')) {
+      dom.passwordNewError.textContent = msg;
+      dom.passwordNew.classList.add('input-error');
+    } else {
+      dom.passwordConfirmError.textContent = msg;
+      dom.passwordConfirm.classList.add('input-error');
+    }
+  } finally {
+    dom.passwordSave.disabled = false;
+    dom.passwordSave.textContent = '保存';
+  }
+}
+
+dom.passwordClose.addEventListener('click', closeChangePassword);
+dom.passwordCancel.addEventListener('click', closeChangePassword);
+dom.passwordSave.addEventListener('click', saveChangePassword);
+dom.passwordOverlay.addEventListener('click', (e) => {
+  if (e.target === dom.passwordOverlay) closeChangePassword();
+});
+[dom.passwordCurrent, dom.passwordNew, dom.passwordConfirm].forEach((input) => {
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveChangePassword();
+    if (e.key === 'Escape') closeChangePassword();
+  });
+});
+
 // === Refresh ===
 dom.refreshBtn.addEventListener('click', () => {
   state.treeNodes = {};
@@ -2138,6 +2396,16 @@ async function refreshCurrent() {
 
 // === Init ===
 async function init() {
+  // Check authentication first
+  const authed = await checkAuth();
+  if (!authed) {
+    redirectToLogin();
+    return;
+  }
+
+  // Show logged-in user in sidebar
+  updateUserDisplay();
+
   try {
     const data = await apiBrowse('');
     state.entries = data.entries;
@@ -2161,6 +2429,46 @@ async function init() {
     const fileCount = state.entries.length - folderCount;
     dom.itemCount.textContent = `${folderCount} 个文件夹, ${fileCount} 个文件`;
   }
+}
+
+function updateUserDisplay() {
+  if (!state.user) return;
+  const existing = document.getElementById('user-display');
+  if (existing) existing.remove();
+
+  const userEl = document.createElement('div');
+  userEl.id = 'user-display';
+  userEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);margin-top:8px;padding-top:8px;';
+
+  const avatar = document.createElement('span');
+  avatar.textContent = '\u{1F464}';
+  avatar.style.fontSize = '14px';
+  userEl.appendChild(avatar);
+
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = state.user.username;
+  nameSpan.style.flex = '1';
+  userEl.appendChild(nameSpan);
+
+  const changePwdBtn = document.createElement('button');
+  changePwdBtn.textContent = '改密';
+  changePwdBtn.title = '修改密码';
+  changePwdBtn.style.cssText = 'background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;';
+  changePwdBtn.addEventListener('mouseenter', () => { changePwdBtn.style.color = 'var(--accent)'; changePwdBtn.style.background = 'rgba(137,180,250,0.1)'; });
+  changePwdBtn.addEventListener('mouseleave', () => { changePwdBtn.style.color = 'var(--text-muted)'; changePwdBtn.style.background = 'none'; });
+  changePwdBtn.addEventListener('click', openChangePassword);
+  userEl.appendChild(changePwdBtn);
+
+  const logoutBtn = document.createElement('button');
+  logoutBtn.textContent = '退出';
+  logoutBtn.style.cssText = 'background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;';
+  logoutBtn.addEventListener('mouseenter', () => { logoutBtn.style.color = 'var(--danger)'; logoutBtn.style.background = 'rgba(243,139,168,0.1)'; });
+  logoutBtn.addEventListener('mouseleave', () => { logoutBtn.style.color = 'var(--text-muted)'; logoutBtn.style.background = 'none'; });
+  logoutBtn.addEventListener('click', doLogout);
+  userEl.appendChild(logoutBtn);
+
+  const footer = document.querySelector('.sidebar-footer');
+  if (footer) footer.before(userEl);
 }
 
 init();
