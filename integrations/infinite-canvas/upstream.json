@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/hero8152/Infinite-Canvas",
+  "pinnedCommit": "06eb6f524dd93dcfdb85e8b76041bddb735063ec",
+  "pinnedAt": "2026-07-18",
+  "archiveRoot": "Infinite-Canvas-06eb6f524dd93dcfdb85e8b76041bddb735063ec",
+  "archiveSha256": "6450b54e22a36e6282f835f4ce6b6f9f68ff29cd4c64cf5c6fd251864a29a953",
+  "sourceTreeSha256": "9d8016081cc8161ee845618388ef1924e02cdf6a751eeb0b8eef408dbcf23397",
+  "integrationMode": "loopback-sidecar",
+  "adapterContractVersion": 1,
+  "licenseNotice": {
+    "commercialUseRequiresAuthorization": true,
+    "derivativeSoftwareMustRemainOpenSource": true,
+    "attributionRequired": true
+  }
+}

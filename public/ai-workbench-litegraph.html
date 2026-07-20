@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 工作台 — LiteGraph.js（接后端）</title>
+<style>
+  :root{--bg:#1e1e2e;--bg2:#181825;--bg3:#313244;--text:#cdd6f4;--muted:#a6adc8;--border:#45475a;--accent:#89b4fa;--green:#a6e3a1;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;display:flex;flex-direction:column;height:100vh;}
+  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  header h1{font-size:14px;margin:0;margin-right:8px;}
+  header .hint{color:var(--muted);font-size:11px;flex:1;}
+  header button{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;}
+  header button:hover{border-color:var(--accent);}
+  header button.primary{background:var(--accent);color:#111;border-color:var(--accent);}
+  .main{flex:1;display:flex;min-height:0;}
+  .lib{width:200px;background:var(--bg2);border-right:1px solid var(--border);padding:10px;overflow-y:auto;}
+  .lib h3{font-size:12px;color:var(--muted);margin:8px 0 6px;}
+  .lib-item{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer;background:var(--bg3);font-size:13px;}
+  .lib-item:hover{border-color:var(--accent);}
+  .lib-item .swatch{width:10px;height:10px;border-radius:50%;}
+  #canvas-wrap{flex:1;position:relative;overflow:hidden;background:#16161d;display:flex;flex-direction:column;}
+  #tabs{border-bottom:1px solid var(--border);background:var(--bg2);display:flex;gap:2px;padding:4px 6px;align-items:center;flex:none;}
+  #mycanvas{flex:1;display:block;width:100%;}
+  .results{border-top:1px solid var(--border);background:var(--bg2);padding:8px;min-height:74px;max-height:120px;overflow-y:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;}
+  .results img{height:60px;border-radius:6px;border:1px solid var(--border);cursor:pointer;}
+  .results .ph{height:60px;width:60px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px dashed var(--border);border-radius:6px;font-size:20px;cursor:pointer;}
+  .log{position:absolute;right:10px;top:10px;width:320px;max-height:40%;overflow:auto;background:rgba(0,0,0,.55);border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;font-size:11px;color:var(--green);}
+  .log .err{color:var(--red);}
+  .legend{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;display:flex;gap:12px;pointer-events:none;}
+  .legend span{display:flex;align-items:center;gap:4px;}
+  .legend i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  #tabs .tab{display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px 6px 0 0;background:var(--bg3);font-size:12px;cursor:pointer;max-width:160px;}
+  #tabs .tab.active{background:var(--accent);color:#111;border-color:var(--accent);}
+  #tabs .tab .x{opacity:.6;cursor:pointer;font-size:14px;margin-left:2px;}
+  #tabs .tab .x:hover{opacity:1;color:var(--red);}
+  #tabs .tab .dt{width:6px;height:6px;border-radius:50%;background:var(--red);}
+  #tabs .add{padding:4px 10px;cursor:pointer;color:var(--muted);font-size:16px;}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9000;}
+  .modal .box{background:var(--bg2);border:1px solid var(--border);border-radius:10px;width:480px;max-height:70vh;display:flex;flex-direction:column;}
+  .modal .hd{padding:10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .modal .bd{flex:1;overflow:auto;padding:10px;}
+  .modal .ft{padding:10px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+  .modal .row{padding:6px;border-radius:6px;cursor:pointer;font-size:13px;}
+  .modal .row:hover{background:var(--bg3);}
+  .mbtn{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧪 LiteGraph.js（接后端）</h1>
+  <span class="hint">画布右键也可加节点；类型不兼容会拒绝连线</span>
+  <button id="btn-run">▶ 运行一次</button>
+  <button id="btn-save">保存到服务器</button>
+  <button id="btn-load">从服务器加载</button>
+  <button id="btn-upload">上传 ComfyUI JSON</button>
+  <button id="btn-exec" class="primary">▶ 运行到后端</button>
+  <input type="file" id="file-json" accept=".json,application/json" style="display:none">
+</header>
+<div class="main">
+  <div class="lib">
+    <h3>通用节点</h3>
+    <div class="lib-item" data-add="ai/image-input"><span class="swatch" style="background:#f5c2e7"></span>🖼 图片输入</div>
+    <div class="lib-item" data-add="ai/text-input"><span class="swatch" style="background:#fab387"></span>📝 文本输入</div>
+    <div class="lib-item" data-add="ai/int-input"><span class="swatch" style="background:#89b4fa"></span>🔢 整数输入</div>
+    <div class="lib-item" data-add="ai/float-input"><span class="swatch" style="background:#b4befe"></span>🔟 小数输入</div>
+    <div class="lib-item" data-add="ai/image-process"><span class="swatch" style="background:#f5c2e7"></span>🪄 图片处理</div>
+    <div class="lib-item" data-add="ai/output"><span class="swatch" style="background:#a6adc8"></span>📤 输出节点</div>
+    <h3>自定义节点</h3>
+    <div class="lib-item"><span class="swatch" style="background:#a6e3a1"></span>点「上传 ComfyUI JSON」生成</div>
+    <div id="custom-list"></div>
+  </div>
+  <div id="canvas-wrap">
+    <div id="tabs"></div>
+    <canvas id="mycanvas"></canvas>
+    <div class="log" id="log"></div>
+    <div class="legend">
+      <span><i style="background:#f5c2e7"></i>image</span>
+      <span><i style="background:#fab387"></i>text</span>
+      <span><i style="background:#89b4fa"></i>int</span>
+      <span><i style="background:#b4befe"></i>float</span>
+      <span><i style="background:#a6adc8"></i>any</span>
+    </div>
+  </div>
+</div>
+<div class="results" id="results"></div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- local-first + CDN fallback loader for LiteGraph ----
+  var LG_JS = [
+    '/vendor/litegraph.min.js',
+    'https://cdn.jsdelivr.net/npm/litegraph.js/build/litegraph.min.js',
+    'https://unpkg.com/litegraph.js/build/litegraph.min.js',
+    'https://cdn.bootcdn.net/ajax/libs/litegraph.js/0.7.18/build/litegraph.min.js'
+  ];
+  var LG_CSS = [
+    '/vendor/litegraph.css',
+    'https://cdn.jsdelivr.net/npm/litegraph.js/css/litegraph.css',
+    'https://unpkg.com/litegraph.js/css/litegraph.css'
+  ];
+  function loadCSS(urls, i){
+    if(i >= urls.length) return;
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = urls[i];
+    l.onerror = function(){ l.remove(); loadCSS(urls, i+1); };
+    document.head.appendChild(l);
+  }
+  function loadJS(urls, i, done, fail){
+    if(i >= urls.length){ fail(); return; }
+    var s = document.createElement('script'); s.src = urls[i];
+    s.onload = function(){ if(window.LiteGraph) done(); else { s.remove(); loadJS(urls, i+1, done, fail); } };
+    s.onerror = function(){ s.remove(); loadJS(urls, i+1, done, fail); };
+    document.head.appendChild(s);
+  }
+  loadCSS(LG_CSS, 0);
+
+  function initApp(){
+  var logEl = document.getElementById('log');
+  function log(m, err){ var d = document.createElement('div'); if(err) d.className='err'; d.textContent = m; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight; }
+  log('启动中…');
+
+  // ---- auth/csrf ----
+  var csrf = '';
+  function getCsrf(){ return fetch('/api/csrf-token',{credentials:'same-origin'}).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){ if(j) csrf = j.token; }).catch(function(){}); }
+  function authFetch(url, opts){
+    opts = opts || {};
+    var m = (opts.method || 'GET').toUpperCase();
+    var o = Object.assign({}, opts, {credentials:'same-origin'});
+    if(m==='POST' || m==='PUT' || m==='DELETE'){
+      o.headers = new Headers(opts.headers || {});
+      if(csrf) o.headers.set('X-CSRF-Token', csrf);
+      if(o.body && !(o.body instanceof FormData) && !o.headers.has('Content-Type')) o.headers.set('Content-Type','application/json');
+    }
+    return fetch(url, o).then(function(r){
+      if(r.status===403 && (m==='POST'||m==='PUT'||m==='DELETE')){
+        return getCsrf().then(function(){ if(csrf) o.headers.set('X-CSRF-Token', csrf); return fetch(url, o); });
+      }
+      return r;
+    });
+  }
+  function jget(u){ return authFetch(u).then(function(r){ if(!r.ok) return r.json().catch(function(){return {};}).then(function(d){ throw new Error(d.error || ('HTTP '+r.status)); }); return r.json(); }); }
+  function jpost(u,b){ return authFetch(u,{method:'POST',body:JSON.stringify(b)}).then(function(r){ if(!r.ok) return r.json().catch(function(){return {};}).then(function(d){ throw new Error(d.error || ('HTTP '+r.status)); }); return r.json(); }); }
+  function jput(u,b){ return authFetch(u,{method:'PUT',body:JSON.stringify(b)}).then(function(r){ if(!r.ok) return r.json().catch(function(){return {};}).then(function(d){ throw new Error(d.error || ('HTTP '+r.status)); }); return r.json(); }); }
+  function checkAuth(){ return authFetch('/api/auth/session').then(function(r){ if(!r.ok){ location.href='/login.html'; return false; } return true; }).catch(function(){ location.href='/login.html'; return false; }); }
+
+  // ---- type compat ----
+  LiteGraph.isValidConnection = function(a, b){
+    if(a === b) return true;
+    if(a === "*" || b === "*" || a === "any" || b === "any") return true;
+    if((a === "int" && b === "float") || (a === "float" && b === "int")) return true;
+    return false;
+  };
+
+  function esc(s){ return String(s==null?'':s).replace(/</g,'&lt;'); }
+
+  // ---- dynamic custom node ----
+  var customDefs = {};
+  function registerCustomNode(def){
+    var defId = def.id;
+    customDefs[defId] = def;
+    var type = 'ai/custom-' + defId;
+    function N(){
+      this.properties = { defId: defId };
+      (def.ports.inputs || []).forEach(function(p){ this.addInput(p.name, p.type); }, this);
+      (def.ports.outputs || []).forEach(function(p){ this.addOutput(p.name, p.type); }, this);
+      (def.ports.inputs || []).forEach(function(p){
+        if(p.default !== undefined){
+          var w = this.addWidget((typeof p.default === 'number') ? 'number' : 'string', p.name, p.default, function(){});
+          w._port = p.name;
+        }
+      }, this);
+    }
+    N.title = def.name;
+    N.prototype.onExecute = function(){
+      var self = this;
+      (def.ports.outputs || []).forEach(function(p, i){ self.setOutputData(i, { kind:'pending', type:p.type }); });
+    };
+    if(LiteGraph.registered_node_types && LiteGraph.registered_node_types[type]) delete LiteGraph.registered_node_types[type];
+    LiteGraph.registerNodeType(type, N);
+    var list = document.getElementById('custom-list');
+    var el = document.createElement('div');
+    el.className = 'lib-item'; el.dataset.add = type;
+    el.innerHTML = '<span class="swatch" style="background:#a6e3a1"></span>🎨 ' + esc(def.name);
+    el.addEventListener('click', function(){ addNode(type); });
+    list.appendChild(el);
+    return type;
+  }
+
+  // ---- generic nodes ----
+  function ImageInputNode(){
+    this.addOutput("image","image");
+    this.properties = { path: "" };
+    var self = this;
+    this.addWidget("string","path","", function(v){ self.properties.path = v; }, {placeholder:"文件路径"});
+    this.addWidget("button","选择文件","", function(){ browseForPath().then(function(p){ if(p){ self.properties.path = p; self.widgets[0].value = p; self.setDirtyCanvas(true); } }); });
+  }
+  ImageInputNode.title = "图片输入";
+  ImageInputNode.prototype.onExecute = function(){ this.setOutputData(0, {kind:"file", type:"image", path:this.properties.path || ""}); };
+  LiteGraph.registerNodeType("ai/image-input", ImageInputNode);
+
+  function TextInputNode(){
+    this.addOutput("text","text");
+    this.properties = { value: "" };
+    var self = this;
+    this.addWidget("string","value","", function(v){ self.properties.value = v; }, {multiline:true});
+  }
+  TextInputNode.title = "文本输入";
+  TextInputNode.prototype.onExecute = function(){ this.setOutputData(0, {kind:"literal", type:"text", value:this.properties.value || ""}); };
+  LiteGraph.registerNodeType("ai/text-input", TextInputNode);
+
+  function IntInputNode(){
+    this.addOutput("int","int");
+    this.properties = { value: 1 };
+    var self = this;
+    this.addWidget("number","value",1, function(v){ self.properties.value = v; }, {step:1});
+  }
+  IntInputNode.title = "整数输入";
+  IntInputNode.prototype.onExecute = function(){ this.setOutputData(0, {kind:"literal", type:"int", value:parseInt(this.properties.value,10)||0}); };
+  LiteGraph.registerNodeType("ai/int-input", IntInputNode);
+
+  function FloatInputNode(){
+    this.addOutput("float","float");
+    this.properties = { value: 0.5 };
+    var self = this;
+    this.addWidget("number","value",0.5, function(v){ self.properties.value = v; }, {step:0.1});
+  }
+  FloatInputNode.title = "小数输入";
+  FloatInputNode.prototype.onExecute = function(){ this.setOutputData(0, {kind:"literal", type:"float", value:parseFloat(this.properties.value)||0}); };
+  LiteGraph.registerNodeType("ai/float-input", FloatInputNode);
+
+  function ImageProcessNode(){
+    this.addInput("image","image");
+    this.addOutput("image","image");
+    this.properties = { width:"", height:"", crop:"crop", format:"", quality:80 };
+    var self = this;
+    this.addWidget("number","宽","", function(v){ self.properties.width = v; });
+    this.addWidget("number","高","", function(v){ self.properties.height = v; });
+    this.addWidget("combo","裁剪","crop", function(v){ self.properties.crop = v; }, {values:["crop","stretch","pad"]});
+    this.addWidget("combo","格式","", function(v){ self.properties.format = v; }, {values:["","jpeg","webp","png"]});
+  }
+  ImageProcessNode.title = "图片处理";
+  ImageProcessNode.prototype.onExecute = function(){
+    var s = this.getInputData(0) || { path:"" };
+    this.setOutputData(0, {kind:"file", type:"image", path:s.path + " [proc]"});
+  };
+  LiteGraph.registerNodeType("ai/image-process", ImageProcessNode);
+
+  function OutputNode(){
+    this.addInput("in","*");
+    this.addOutput("out","*");
+  }
+  OutputNode.title = "输出节点";
+  OutputNode.prototype.onExecute = function(){ this.setOutputData(0, this.getInputData(0)); };
+  LiteGraph.registerNodeType("ai/output", OutputNode);
+
+  // ---- editor ----
+  var graph = new LGraph();
+  var lgCanvas = new LGraphCanvas("#mycanvas", graph);
+  graph.start(); graph.stop();
+
+  function fit(){
+    var c = document.getElementById('mycanvas');
+    var r = c.getBoundingClientRect();
+    c.width = r.width; c.height = r.height;
+    lgCanvas.resize();
+  }
+  window.addEventListener('resize', fit);
+
+  // ---- tabs ----
+  var tabsEl = document.getElementById('tabs');
+  var tabs = [];
+  var activeIdx = -1;
+  var currentWfId = null;
+
+  function renderTabs(){
+    var h = '';
+    tabs.forEach(function(t, i){
+      h += '<div class="tab ' + (i===activeIdx?'active':'') + '" data-i="' + i + '"><span>' + esc(t.name) + '</span>';
+      if(t.dirty) h += '<span class="dt" title="未保存"></span>';
+      h += '<span class="x" data-x="' + i + '">×</span></div>';
+    });
+    h += '<span class="add" data-new>＋</span>';
+    tabsEl.innerHTML = h;
+    var ts = tabsEl.querySelectorAll('.tab');
+    ts.forEach(function(el){ el.addEventListener('click', function(e){ if(e.target.dataset && e.target.dataset.x !== undefined) return; switchTab(parseInt(el.dataset.i,10)); }); });
+    tabsEl.querySelectorAll('[data-x]').forEach(function(el){ el.addEventListener('click', function(){ closeTab(parseInt(el.dataset.x,10)); }); });
+    tabsEl.querySelector('[data-new]').addEventListener('click', newTab);
+  }
+  function newTab(name){
+    tabs.push({ name: name || '未命名工作流', id: null, data: null, dirty: false });
+    switchTab(tabs.length - 1);
+  }
+  function switchTab(i){
+    if(i === activeIdx) return;
+    if(activeIdx >= 0 && tabs[activeIdx]) tabs[activeIdx].data = graph.serialize();
+    activeIdx = i;
+    var t = tabs[i];
+    graph.clear();
+    if(t.data){ try{ graph.configure(t.data); }catch(e){ log('恢复标签失败: '+e.message, true); } }
+    lgCanvas.setDirty(true, true);
+    currentWfId = t.id;
+    renderTabs();
+  }
+  function closeTab(i){
+    var t = tabs[i];
+    if(t.dirty && !confirm('关闭「' + t.name + '」?未保存改动将丢失')) return;
+    tabs.splice(i, 1);
+    if(activeIdx === i){ activeIdx = -1; graph.clear(); lgCanvas.setDirty(true,true); currentWfId = null; if(tabs.length) switchTab(Math.min(i, tabs.length-1)); }
+    else if(activeIdx > i){ activeIdx--; }
+    renderTabs();
+  }
+  function markDirty(){ if(tabs[activeIdx]){ tabs[activeIdx].dirty = true; renderTabs(); } }
+  graph.onNodeAdded = graph.onNodeRemoved = function(){ markDirty(); };
+  // LiteGraph uses node-level onConnectionsChange (not graph-level onConnectionAdded)
+  LGraphNode.prototype.onConnectionsChange = function(){ markDirty(); };
+
+  var seq = 0;
+  function addNode(type){
+    var n = LiteGraph.createNode(type);
+    seq++;
+    n.pos = [200 + (seq % 5) * 70, 120 + (seq % 5) * 70];
+    graph.add(n);
+    lgCanvas.setDirty(true, true);
+    markDirty();
+  }
+  document.querySelectorAll('.lib-item[data-add]').forEach(function(el){ el.addEventListener('click', function(){ addNode(el.dataset.add); }); });
+  document.getElementById('btn-run').addEventListener('click', function(){ log('— runStep —'); try{ graph.runStep(1); }catch(e){ log(e.message, true); } });
+
+  // ---- browse modal ----
+  function browseForPath(){
+    return new Promise(function(resolve){
+      var cwd = '';
+      var ov = document.createElement('div');
+      ov.className = 'modal';
+      ov.innerHTML = '<div class="box"><div class="hd"><b>选择文件</b><button class="mbtn" data-x>×</button></div>' +
+        '<div class="bd"><div style="display:flex;gap:6px;margin-bottom:8px"><button class="mbtn" data-up>上级</button><span data-path style="flex:1;font-family:monospace;font-size:12px;color:var(--muted)"></span></div><div data-grid></div></div>' +
+        '<div class="ft"><button class="mbtn" data-cancel>取消</button></div></div>';
+      document.body.appendChild(ov);
+      var grid = ov.querySelector('[data-grid]'), pathEl = ov.querySelector('[data-path]');
+      function close(v){ ov.remove(); resolve(v || null); }
+      ov.querySelector('[data-x]').onclick = function(){ close(null); };
+      ov.querySelector('[data-cancel]').onclick = function(){ close(null); };
+      ov.addEventListener('click', function(e){ if(e.target === ov) close(null); });
+      ov.querySelector('[data-up]').onclick = function(){ cwd = cwd.split('/').slice(0,-1).join('/'); render(); };
+      function render(){
+        pathEl.textContent = '/' + cwd;
+        grid.innerHTML = '<div style="color:var(--muted)">加载…</div>';
+        jget('/api/browse?path=' + encodeURIComponent(cwd)).then(function(data){
+          grid.innerHTML = '';
+          (data.entries || []).forEach(function(it){
+            if(it.type === 'directory'){
+              var d = document.createElement('div'); d.className = 'row'; d.textContent = '📁 ' + it.name;
+              d.onclick = function(){ cwd = cwd ? cwd + '/' + it.name : it.name; render(); };
+              grid.appendChild(d);
+            } else {
+              var ext = (it.name.split('.').pop() || '').toLowerCase();
+              if(['jpg','jpeg','png','gif','webp','bmp'].includes(ext)){
+                var p = cwd ? cwd + '/' + it.name : it.name;
+                var d = document.createElement('div'); d.className = 'row'; d.textContent = '🖼 ' + it.name; d.style.color = 'var(--green)';
+                d.onclick = function(){ close(p); };
+                grid.appendChild(d);
+              }
+            }
+          });
+          if(!grid.children.length) grid.innerHTML = '<div style="color:var(--muted)">无图片</div>';
+        }).catch(function(e){ grid.innerHTML = '<div style="color:var(--red)">' + esc(e.message) + '</div>'; });
+      }
+      render();
+    });
+  }
+
+  // ---- conversion ----
+  function lgTypeToBackend(t){
+    if(t.indexOf('ai/custom-') === 0) return 'custom';
+    return t.replace(/^ai\//, '');
+  }
+  function backendTypeToLg(t, defId){
+    if(t === 'custom' && defId) return 'ai/custom-' + defId;
+    return 'ai/' + t;
+  }
+  function extractData(n){
+    var t = n.type;
+    if(t.indexOf('ai/custom-') === 0){
+      var defId = n.properties.defId;
+      var portValues = {};
+      (n.widgets || []).forEach(function(w){ if(w._port) portValues[w._port] = w.value; });
+      return { defId: defId, portValues: portValues };
+    }
+    if(t === 'ai/image-input') return { path: n.properties.path };
+    if(t === 'ai/text-input') return { value: n.properties.value };
+    if(t === 'ai/int-input') return { value: n.properties.value };
+    if(t === 'ai/float-input') return { value: n.properties.value };
+    if(t === 'ai/image-process') return { width: n.properties.width, height: n.properties.height, crop: n.properties.crop, format: n.properties.format, quality: n.properties.quality };
+    return {};
+  }
+  function graphToBackend(){
+    var nodes = graph.nodes.map(function(n){ return { id: String(n.id), type: lgTypeToBackend(n.type), x: n.pos[0], y: n.pos[1], data: extractData(n) }; });
+    var edges = [];
+    for(var id in graph.links){
+      var L = graph.links[id]; if(!L) continue;
+      var arr = L.data;
+      var oId = arr[0], oSlot = arr[1], tId = arr[2], tSlot = arr[3], linkType = arr[4];
+      var oNode = graph.getNodeById(oId), tNode = graph.getNodeById(tId);
+      if(!oNode || !tNode) continue;
+      var oPort = oNode.outputs[oSlot], tPort = tNode.inputs[tSlot];
+      if(!oPort || !tPort) continue;
+      edges.push({ id: 'l' + L.id, from: oId + '.' + oPort.name, to: tId + '.' + tPort.name, type: linkType || oPort.type });
+    }
+    return { nodes: nodes, edges: edges };
+  }
+  function backendToGraph(wf){
+    var customLoads = [];
+    (wf.nodes || []).forEach(function(n){
+      if(n.type === 'custom' && n.data && n.data.defId && !customDefs[n.data.defId]){
+        customLoads.push(jget('/api/ai/node-defs/' + n.data.defId).then(registerCustomNode, function(){ log('自定义定义缺失 ' + n.data.defId, true); }));
+      }
+    });
+    return Promise.all(customLoads).then(function(){
+      graph.clear();
+      var idMap = {};
+      (wf.nodes || []).forEach(function(n){
+        var lgType = backendTypeToLg(n.type, n.data && n.data.defId);
+        var node = LiteGraph.createNode(lgType);
+        node.pos = [n.x || 0, n.y || 0];
+        if(n.type === 'image-input') node.properties.path = n.data.path || '';
+        else if(n.type === 'text-input') node.properties.value = n.data.value || '';
+        else if(n.type === 'int-input') node.properties.value = n.data.value;
+        else if(n.type === 'float-input') node.properties.value = n.data.value;
+        else if(n.type === 'image-process'){ node.properties.width = n.data.width; node.properties.height = n.data.height; node.properties.crop = n.data.crop; node.properties.format = n.data.format; node.properties.quality = n.data.quality; }
+        else if(n.type === 'custom'){ node.properties.defId = n.data.defId; if(n.data.portValues){ (node.widgets || []).forEach(function(w){ if(w._port && n.data.portValues[w._port] !== undefined) w.value = n.data.portValues[w._port]; }); } }
+        graph.add(node);
+        idMap[n.id] = node;
+        // sync generic widget values
+        var p = node.properties || {};
+        (node.widgets || []).forEach(function(w){
+          if(p.path !== undefined && w.name === 'path') w.value = p.path;
+          else if(p.value !== undefined && w.name === 'value') w.value = p.value;
+          else if(p.width !== undefined && w.name === '宽') w.value = p.width;
+          else if(p.height !== undefined && w.name === '高') w.value = p.height;
+          else if(p.crop !== undefined && w.name === '裁剪') w.value = p.crop;
+          else if(p.format !== undefined && w.name === '格式') w.value = p.format;
+        });
+      });
+      (wf.edges || []).forEach(function(e){
+        var fN = e.from.split('.')[0], fP = e.from.split('.').slice(1).join('.');
+        var tN = e.to.split('.')[0], tP = e.to.split('.').slice(1).join('.');
+        var f = idMap[fN], t = idMap[tN]; if(!f || !t) return;
+        var fi = f.outputs.findIndex(function(o){ return o.name === fP; });
+        var ti = t.inputs.findIndex(function(i){ return i.name === tP; });
+        if(fi >= 0 && ti >= 0) f.connect(fi, t, ti);
+      });
+      lgCanvas.setDirty(true, true);
+    });
+  }
+
+  // ---- save / load / upload ----
+  document.getElementById('btn-save').addEventListener('click', function(){
+    var t = tabs[activeIdx];
+    var name = prompt('工作流名称', (t && t.name) || '未命名工作流'); if(!name) return;
+    var payload = graphToBackend(); payload.name = name;
+    var p = currentWfId ? jput('/api/ai/workflows/' + currentWfId, payload) : jpost('/api/ai/workflows', payload);
+    p.then(function(r){ if(!currentWfId){ currentWfId = r.id; log('已保存工作流 ' + r.id); } else { log('已更新工作流 ' + currentWfId); } if(t){ t.name = name; t.id = currentWfId; t.dirty = false; renderTabs(); } })
+     .catch(function(e){ log('保存失败: ' + e.message, true); });
+  });
+  document.getElementById('btn-load').addEventListener('click', function(){
+    jget('/api/ai/workflows').then(function(list){
+      var wfs = list.workflows || [];
+      if(!wfs.length){ log('无已保存工作流'); return; }
+      var choice = prompt('选择工作流（输入序号）:\n' + wfs.map(function(w,i){ return i + ': ' + w.name; }).join('\n'));
+      var idx = parseInt(choice, 10); if(isNaN(idx) || !wfs[idx]) return;
+      return jget('/api/ai/workflows/' + wfs[idx].id).then(function(wf){
+        tabs.push({ name: wf.name, id: wf.id, data: null, dirty: false });
+        switchTab(tabs.length - 1);
+        return backendToGraph(wf).then(function(){ log('已加载工作流 ' + wf.name + ' 到新标签'); });
+      });
+    }).catch(function(e){ log('加载失败: ' + e.message, true); });
+  });
+  document.getElementById('btn-upload').addEventListener('click', function(){ document.getElementById('file-json').click(); });
+  document.getElementById('file-json').addEventListener('change', function(){
+    var f = document.getElementById('file-json').files[0]; if(!f) return;
+    f.text().then(function(txt){
+      var json = JSON.parse(txt);
+      var name = prompt('节点名称', f.name.replace(/\.json$/, ''));
+      if(!name) return;
+      return jpost('/api/ai/node-defs', { name: name, json: json }).then(function(r){ return jget('/api/ai/node-defs/' + r.id); })
+        .then(function(def){ registerCustomNode(def); log('已注册自定义节点: ' + def.name); });
+    }).catch(function(e){ log('上传失败: ' + e.message, true); });
+    document.getElementById('file-json').value = '';
+  });
+
+  // ---- run on backend ----
+  var resultsEl = document.getElementById('results');
+  function pollTask(taskId){
+    return new Promise(function(resolve){
+      var t = setInterval(function(){
+        jget('/api/ai/tasks/' + taskId).then(function(td){
+          if(td.status === 'running' || td.status === 'queued'){ resultsEl.innerHTML = '<div class="ph">⏳ ' + td.status + ' ' + (td.currentStep||0) + '/' + (td.stepCount||0) + '</div>'; return; }
+          clearInterval(t);
+          var rs = td.results || [];
+          resultsEl.innerHTML = '';
+          if(td.status !== 'completed'){ log('任务' + td.status + ': ' + (td.error||''), true); resultsEl.innerHTML = '<div class="ph">✗ ' + td.status + '</div>'; resolve(); return; }
+          if(!rs.length) resultsEl.innerHTML = '<div class="ph">无结果</div>';
+          rs.forEach(function(r){
+            var url = '/api/ai/file?path=' + encodeURIComponent(r.file);
+            if(r.type === 'image'){ var img = document.createElement('img'); img.src = url; img.title = r.file; img.onclick = function(){ window.open(url); }; resultsEl.appendChild(img); }
+            else { var d = document.createElement('div'); d.className = 'ph'; d.textContent = '🎬'; d.title = r.file; d.onclick = function(){ window.open(url); }; resultsEl.appendChild(d); }
+          });
+          log('任务完成，结果 ' + rs.length + ' 个');
+          resolve();
+        }).catch(function(e){ clearInterval(t); log('轮询失败: ' + e.message, true); resolve(); });
+      }, 1500);
+    });
+  }
+  document.getElementById('btn-exec').addEventListener('click', function(){
+    var doExec = function(){ return jpost('/api/ai/tasks', { workflowId: currentWfId }).then(function(r){ log('已提交任务 ' + r.taskId); resultsEl.innerHTML = '<div class="ph">⏳ 提交…</div>'; return pollTask(r.taskId); }); };
+    if(currentWfId){ doExec().catch(function(e){ log('提交失败: ' + e.message, true); }); return; }
+    var nm = prompt('先保存工作流，名称'); if(!nm) return;
+    var payload = graphToBackend(); payload.name = nm;
+    jpost('/api/ai/workflows', payload).then(function(r){
+      currentWfId = r.id; log('已自动保存 ' + r.id);
+      var t = tabs[activeIdx]; if(t){ t.name = nm; t.id = currentWfId; t.dirty = false; renderTabs(); }
+      return doExec();
+    }).catch(function(e){ log('提交失败: ' + e.message, true); });
+  });
+
+  // ---- init ----
+  checkAuth().then(function(ok){
+    if(!ok) return;
+    return getCsrf();
+  }).then(function(){
+    fit();
+    newTab('未命名工作流');
+    var a = LiteGraph.createNode("ai/image-input"); a.pos = [120,120]; graph.add(a);
+    var p = LiteGraph.createNode("ai/image-process"); p.pos = [420,120]; graph.add(p);
+    var o = LiteGraph.createNode("ai/output"); o.pos = [720,120]; graph.add(o);
+    a.connect(0, p, 0); p.connect(0, o, 0);
+    tabs[0].dirty = false; renderTabs();
+    log('就绪。可上传 ComfyUI JSON、保存、运行到后端。多标签用顶部 ＋');
+  });
+  } // end initApp
+
+  // bootstrap: load LiteGraph then init
+  var failEl = document.getElementById('log');
+  loadJS(LG_JS, 0, initApp, function(){
+    var el = document.getElementById('log');
+    el.innerHTML = '<div class="err" style="color:var(--red)">无法加载 LiteGraph.js：本地 /vendor/litegraph.min.js 不存在且 CDN（jsdelivr/unpkg/bootcdn）均不可达。<br>请下载 https://cdn.jsdelivr.net/npm/litegraph.js/build/litegraph.min.js 放到 public/vendor/litegraph.min.js，刷新即可。</div>';
+    console.error('LiteGraph 加载失败，所有来源均不可用');
+  });
+})();
+</script>
+</body>
+</html>

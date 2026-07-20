@@ -250,7 +250,7 @@
 
       async function fetchCsrfToken() {
         try {
-          const res = await fetch('/api/csrf-token', { method: 'GET', credentials: 'same-origin' });
+          const res = await fetch('/api/csrf-token', { method: 'GET', credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             csrfToken = data.token;
@@ -263,7 +263,7 @@
 
       async function checkSession() {
         try {
-          const res = await fetch('/api/auth/session', { method: 'GET', credentials: 'same-origin' });
+          const res = await fetch('/api/auth/session', { method: 'GET', credentials: 'include' });
           if (res.ok) {
             window.location.href = '/';
             return true;
@@ -299,7 +299,7 @@
           const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: headers,
-            credentials: 'same-origin',
+            credentials: 'include',
             body: JSON.stringify({ username, password }),
           });
 

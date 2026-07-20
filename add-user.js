@@ -33,7 +33,7 @@ async function main() {
   }
 
   const { hash } = hashPassword(password);
-  const isAdmin = adminFlag === 'true' || adminFlag === '1';
+  const isAdmin = adminFlag === 'true' || adminFlag === '1' || adminFlag === 'True' || adminFlag === 'TRUE';
 
   users.push({
     username,

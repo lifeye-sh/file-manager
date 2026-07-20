@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 工作台 — Drawflow 原型</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+<script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
+<style>
+  :root { --bg:#1e1e2e; --bg2:#181825; --bg3:#313244; --text:#cdd6f4; --muted:#a6adc8; --border:#45475a; --accent:#89b4fa; --green:#a6e3a1; --pink:#f5c2e7; --peach:#fab387; --red:#f38ba8; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; display:flex; flex-direction:column; height:100vh; }
+  header { display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--bg2); border-bottom:1px solid var(--border); }
+  header h1 { font-size:15px; margin:0; }
+  header .hint { color:var(--muted); font-size:12px; }
+  header button { background:var(--bg3); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px; }
+  header button:hover { border-color:var(--accent); }
+  .main { flex:1; display:flex; min-height:0; }
+  .lib { width:200px; background:var(--bg2); border-right:1px solid var(--border); padding:10px; overflow-y:auto; }
+  .lib h3 { font-size:12px; color:var(--muted); margin:8px 0 6px; }
+  .lib-item { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--border); border-radius:6px; margin-bottom:6px; cursor:pointer; background:var(--bg3); font-size:13px; }
+  .lib-item:hover { border-color:var(--accent); }
+  .lib-item .swatch { width:10px; height:10px; border-radius:50%; }
+  #drawflow-wrap { flex:1; position:relative; overflow:hidden; background:var(--bg); }
+  /* Drawflow dark overrides */
+  #drawflow { width:100%; height:100%; background:var(--bg) !important; }
+  .drawflow .drawflow-node { background:var(--bg3) !important; border:1px solid var(--border) !important; color:var(--text) !important; border-radius:8px; }
+  .drawflow .drawflow-node.selected { border-color:var(--accent) !important; }
+  .drawflow .drawflow-node .drawflow_content_node { padding:6px 10px; }
+  .drawflow .drawflow-node .input, .drawflow .drawflow-node .output { background:var(--bg2) !important; border:2px solid var(--border) !important; }
+  .drawflow .drawflow-node .input.image, .drawflow .drawflow-node .output.image { background:var(--pink) !important; }
+  .drawflow .drawflow-node .input.text, .drawflow .drawflow-node .output.text { background:var(--peach) !important; }
+  .drawflow .drawflow-node .input.int, .drawflow .drawflow-node .output.int { background:#89b4fa !important; }
+  .drawflow .drawflow-node .input.float, .drawflow .drawflow-node .output.float { background:#b4befe !important; }
+  .drawflow .drawflow-node .input.any, .drawflow .drawflow-node .output.any { background:var(--muted) !important; }
+  .drawflow .drawflow-node .drawflow_content_node input, .drawflow .drawflow-node .drawflow_content_node select { background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:3px 6px; font-size:12px; }
+  .node-title { font-size:12px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+  .node-title .ico { font-size:14px; }
+  .nd-row { display:flex; align-items:center; gap:6px; margin:3px 0; font-size:11px; }
+  .nd-row label { color:var(--muted); min-width:32px; }
+  .thumb { width:60px; height:60px; border-radius:6px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:22px; border:1px dashed var(--border); margin:4px auto; }
+  .log { position:absolute; right:10px; bottom:10px; width:340px; max-height:40%; overflow:auto; background:rgba(0,0,0,.5); border:1px solid var(--border); border-radius:8px; padding:8px; font-family:monospace; font-size:11px; color:var(--green); }
+  .log .err { color:var(--red); }
+  .legend { position:absolute; left:10px; bottom:10px; background:rgba(0,0,0,.4); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:11px; display:flex; gap:12px; }
+  .legend span { display:flex; align-items:center; gap:4px; }
+  .legend i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧪 AI 工作台 — Drawflow 原型</h1>
+  <span class="hint">点击左侧节点库添加；拖端口连线；类型不兼容会拒绝</span>
+  <span style="flex:1"></span>
+  <button id="btn-run">▶ 运行数据流</button>
+  <button id="btn-export">导出 JSON</button>
+</header>
+<div class="main">
+  <div class="lib">
+    <h3>通用节点</h3>
+    <div class="lib-item" data-add="image-input"><span class="swatch" style="background:var(--pink)"></span>🖼 图片输入</div>
+    <div class="lib-item" data-add="text-input"><span class="swatch" style="background:var(--peach)"></span>📝 文本输入</div>
+    <div class="lib-item" data-add="int-input"><span class="swatch" style="background:#89b4fa"></span>🔢 整数输入</div>
+    <div class="lib-item" data-add="float-input"><span class="swatch" style="background:#b4befe"></span>🔟 小数输入</div>
+    <div class="lib-item" data-add="image-process"><span class="swatch" style="background:var(--pink)"></span>🪄 图片处理</div>
+    <div class="lib-item" data-add="output"><span class="swatch" style="background:var(--muted)"></span>📤 输出节点</div>
+    <h3>自定义节点</h3>
+    <div class="lib-item" data-add="custom"><span class="swatch" style="background:var(--pink)"></span>🎨 ComfyUI 自定义</div>
+  </div>
+  <div id="drawflow-wrap">
+    <div id="drawflow"></div>
+    <div class="legend">
+      <span><i style="background:var(--pink)"></i>image</span>
+      <span><i style="background:var(--peach)"></i>text</span>
+      <span><i style="background:#89b4fa"></i>int</span>
+      <span><i style="background:#b4befe"></i>float</span>
+      <span><i style="background:var(--muted)"></i>any</span>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const logEl = document.getElementById('log');
+  function log(msg, err){ const d=document.createElement('div'); if(err) d.className='err'; d.textContent=msg; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
+  log('Drawflow 原型已启动');
+
+  const editor = new Drawflow(document.getElementById('drawflow'));
+  editor.reroute = true;
+  editor.start();
+
+  // ---- port type helpers ----
+  // data.inTypes / data.outTypes are arrays indexed by port number (1-based via output_class "output_N")
+  function portType(node, side, cls){
+    // cls like "output_1" / "input_1"
+    const idx = parseInt(cls.replace(/^(output|input)_/, ''), 10) - 1;
+    const arr = side==='out' ? (node.data.outTypes||[]) : (node.data.inTypes||[]);
+    return arr[idx] || 'any';
+  }
+  function canConnect(outType, inType){
+    if(inType==='any') return true;
+    if(outType===inType) return true;
+    if(outType==='int' && inType==='float') return true;
+    return false;
+  }
+
+  editor.on('connectionCreated', function(info){
+    const a = editor.getNodeFromId(info.output_id);
+    const b = editor.getNodeFromId(info.input_id);
+    const outType = portType(a, 'out', info.output_class);
+    const inType = portType(b, 'in', info.input_class);
+    if(!canConnect(outType, inType)){
+      editor.removeSingleConnection(info.output_id, info.input_id, info.output_class, info.input_class);
+      log(`✗ 拒绝连线: ${outType} → ${inType}（类型不兼容）`, true);
+    } else {
+      log(`✓ 连线: ${a.name}.${info.output_class}[${outType}] → ${b.name}.${info.input_class}[${inType}]`);
+    }
+  });
+
+  // ---- node builders ----
+  let seq = 0;
+  function nextPos(){ seq++; return { x: 120 + (seq%4)*60, y: 80 + (seq%4)*60 }; }
+
+  function addImageInput(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">🖼</span>图片输入</div>
+      <div class="thumb">🖼</div>
+      <div class="nd-row"><label>路径</label><input type="text" df-path placeholder="选择文件" style="flex:1"></div>`;
+    editor.addNode('image-input', 0, 1, x, y, 'image-input', { outTypes:['image'], path:'' }, html);
+  }
+  function addTextInput(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">📝</span>文本输入</div>
+      <textarea df-value rows="3" style="width:170px" placeholder="输入文本..."></textarea>`;
+    editor.addNode('text-input', 0, 1, x, y, 'text-input', { outTypes:['text'], value:'' }, html);
+  }
+  function addIntInput(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">🔢</span>整数输入</div>
+      <div class="nd-row"><label>值</label><input type="number" df-value value="1" step="1" style="flex:1"></div>`;
+    editor.addNode('int-input', 0, 1, x, y, 'int-input', { outTypes:['int'], value:1 }, html);
+  }
+  function addFloatInput(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">🔟</span>小数输入</div>
+      <div class="nd-row"><label>值</label><input type="number" df-value value="0.5" step="0.1" style="flex:1"></div>`;
+    editor.addNode('float-input', 0, 1, x, y, 'float-input', { outTypes:['float'], value:0.5 }, html);
+  }
+  function addImageProcess(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">🪄</span>图片处理</div>
+      <div class="nd-row"><label>宽</label><input type="number" df-width placeholder="自动" style="flex:1"></div>
+      <div class="nd-row"><label>高</label><input type="number" df-height placeholder="自动" style="flex:1"></div>
+      <div class="nd-row"><label>裁剪</label><select df-crop style="flex:1"><option value="crop">裁剪</option><option value="stretch">拉伸</option><option value="pad">留白</option></select></div>
+      <div class="nd-row"><label>格式</label><select df-format style="flex:1"><option value="">保持</option><option value="jpeg">JPEG</option><option value="webp">WebP</option></select></div>`;
+    editor.addNode('image-process', 1, 1, x, y, 'image-process', { inTypes:['image'], outTypes:['image'], width:'', height:'', crop:'crop', format:'' }, html);
+  }
+  function addOutput(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">📤</span>输出节点</div>
+      <div class="nd-row" style="color:var(--muted)">透传：保存输入为结果</div>`;
+    editor.addNode('output', 1, 1, x, y, 'output', { inTypes:['any'], outTypes:['any'] }, html);
+  }
+  function addCustom(){
+    const {x,y}=nextPos();
+    const html = `<div class="node-title"><span class="ico">🎨</span>ComfyUI 自定义</div>
+      <div class="nd-row"><label>提示词</label><input type="text" df-prompt placeholder="prompt" style="flex:1"></div>
+      <div class="nd-row"><label>步数</label><input type="number" df-steps value="20" style="flex:1"></div>`;
+    // 示例：image 输入 + text(prompt 已内置) → image 输出
+    editor.addNode('custom', 1, 1, x, y, 'custom', { inTypes:['image'], outTypes:['image'], prompt:'', steps:20 }, html);
+  }
+
+  const builders = { 'image-input':addImageInput, 'text-input':addTextInput, 'int-input':addIntInput, 'float-input':addFloatInput, 'image-process':addImageProcess, 'output':addOutput, 'custom':addCustom };
+  document.querySelectorAll('.lib-item').forEach(el => el.addEventListener('click', () => builders[el.dataset.add] && builders[el.dataset.add]()));
+
+  // ---- export ----
+  document.getElementById('btn-export').addEventListener('click', () => {
+    const data = editor.export();
+    log('导出 JSON: ' + JSON.stringify(data).slice(0,120) + '...');
+    console.log('drawflow export', data);
+  });
+
+  // ---- simple dataflow execution (replaces hand-written buildGraph) ----
+  function topoSort(nodes, edges){
+    // nodes: map id->node, edges: [{out, in}]
+    const indeg = {}; for(const id in nodes) indeg[id]=0;
+    edges.forEach(e => indeg[e.in] = (indeg[e.in]||0)+1);
+    const q = Object.keys(nodes).filter(id => indeg[id]===0);
+    const order = [];
+    while(q.length){ const id=q.shift(); order.push(id);
+      edges.filter(e=>e.out===id).forEach(e=>{ indeg[e.in]--; if(indeg[e.in]===0) q.push(e.in); });
+    }
+    if(order.length !== Object.keys(nodes).length) throw new Error('画布存在环路');
+    return order;
+  }
+  function canConnect2(o,i){ if(i==='any')return true; if(o===i)return true; if(o==='int'&&i==='float')return true; return false; }
+
+  document.getElementById('btn-run').addEventListener('click', () => {
+    const data = editor.export().drawflow.Home.data;
+    const nodes = {}; const edges = [];
+    for(const id in data){ nodes[id]=data[id]; }
+    for(const id in data){
+      const outs = data[id].outputs || {};
+      for(const oc in outs){
+        (outs[oc].connections||[]).forEach(c => {
+          const outType = (data[id].data.outTypes||[])[parseInt(oc.replace('output_',''),10)-1]||'any';
+          const inType = (data[c.node].data.inTypes||[])[parseInt(c.input.replace('input_',''),10)-1]||'any';
+          if(!canConnect2(outType, inType)){ log(`✗ 跳过无效边 ${id}→${c.node}`, true); return; }
+          edges.push({ out:id, in:c.node, outType, inType });
+        });
+      }
+    }
+    let order;
+    try { order = topoSort(nodes, edges); } catch(e){ log(e.message, true); return; }
+    log(`拓扑序: ${order.map(id=>nodes[id].name).join(' → ')}`);
+    // demo value propagation
+    const vals = {};
+    order.forEach(id => {
+      const n = nodes[id]; const name = n.name;
+      if(name==='image-input'){ vals[id]={type:'image', path:n.data.path||'(未选图)'}; log(`🖼 image-input → ${vals[id].path}`); }
+      else if(name==='text-input'){ vals[id]={type:'text', value:n.data.value||''}; log(`📝 text → "${(n.data.value||'').slice(0,20)}"`); }
+      else if(name==='int-input'){ vals[id]={type:'int', value:n.data.value}; log(`🔢 int → ${n.data.value}`); }
+      else if(name==='float-input'){ vals[id]={type:'float', value:n.data.value}; log(`🔟 float → ${n.data.value}`); }
+      else if(name==='image-process'){
+        const ins = edges.filter(e=>e.in===id);
+        const src = ins.length ? vals[ins[0].out] : null;
+        vals[id]={type:'image', path:(src&&src.path||'(无输入)') + ` [处理 ${n.data.width||'自动'}×${n.data.height||'自动'} ${n.data.crop} ${n.data.format||'保持'}]`};
+        log(`🪄 image-process(${src?src.path:'∅'}) → ${vals[id].path}`);
+      }
+      else if(name==='custom'){
+        const ins = edges.filter(e=>e.in===id);
+        const src = ins.length ? vals[ins[0].out] : null;
+        vals[id]={type:'image', path:`ComfyUI(prompt=${(n.data.prompt||'').slice(0,12)},steps=${n.data.steps}) ← ${src?src.path:'∅'}`};
+        log(`🎨 custom → ${vals[id].path}`);
+      }
+      else if(name==='output'){
+        const ins = edges.filter(e=>e.in===id);
+        const src = ins.length ? vals[ins[0].out] : null;
+        log(`📤 输出保存: ${src? JSON.stringify(src) : '(无输入)'}`);
+      }
+    });
+    log('— 运行完成 —');
+  });
+
+  // seed a sample graph
+  addImageInput(); addImageProcess(); addOutput();
+  log('已放置示例：图片输入 → 图片处理 → 输出（请手动连线）');
+})();
+</script>
+</body>
+</html>

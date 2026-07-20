@@ -1,8 +1,11 @@
 node_modules/
 .thumbcache/
+.aiworkbench/
 config.json
 users.json
 *.log
 .DS_Store
 Thumbs.db
 .env
+__pycache__/
+*.py[cod]

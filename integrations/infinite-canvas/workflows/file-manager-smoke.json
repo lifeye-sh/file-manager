@@ -1,0 +1,27 @@
+{
+  "1": {
+    "inputs": {
+      "width": 64,
+      "height": 64,
+      "batch_size": 1,
+      "color": 3368652
+    },
+    "class_type": "EmptyImage",
+    "_meta": {
+      "title": "File Manager smoke image"
+    }
+  },
+  "2": {
+    "inputs": {
+      "filename_prefix": "file_manager_smoke",
+      "images": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "File Manager smoke output"
+    }
+  }
+}

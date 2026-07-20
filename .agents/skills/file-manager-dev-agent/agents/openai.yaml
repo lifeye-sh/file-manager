@@ -1,0 +1,4 @@
+interface:
+  display_name: "文件管理器开发智能体"
+  short_description: "面向文件管理、AI工作流与无限画布集成的安全开发维护智能体"
+  default_prompt: "Use $file-manager-dev-agent to safely analyze, implement, and verify the requested change in this file-manager project."

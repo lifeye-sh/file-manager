@@ -988,6 +988,34 @@ body {
   background: var(--border);
   margin: 4px 8px;
 }
+.context-menu-item.ctx-has-sub { justify-content: space-between; }
+.context-menu-item.ctx-has-sub .arrow { font-size: 10px; opacity: 0.5; }
+.context-menu-item.ctx-has-sub:focus,
+.context-menu-item.ctx-has-sub:focus-within { background: var(--bg-hover); }
+.context-submenu {
+  position: absolute;
+  left: 100%; top: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 3001;
+}
+.context-submenu.hidden { display: none; }
+.ctx-sub-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+.ctx-sub-item:hover { background: var(--bg-hover); }
+.ctx-sub-loading { padding: 8px 16px; font-size: 12px; color: var(--muted); }
+.ctx-sub-empty { padding: 8px 16px; font-size: 12px; color: var(--muted); }
 
 /* === File Card Context Target === */
 .file-card.context-target { background: var(--bg-hover); outline: 1px solid var(--accent); }

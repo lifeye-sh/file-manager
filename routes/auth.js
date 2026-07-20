@@ -56,24 +56,36 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-function setAuthCookie(res, token, secure) {
+function _isReqSecure(secure, req) {
+  // HTTPS directly, or behind a reverse proxy that sets x-forwarded-proto
+  if (secure) return true;
+  if (req && req.secure) return true;
+  if (req && req.headers && req.headers['x-forwarded-proto'] === 'https') return true;
+  return false;
+}
+
+function setAuthCookie(res, token, secure, req) {
+  const isSecure = _isReqSecure(secure, req);
   const parts = [
     'auth_token=' + token,
-    'Path=/', 'HttpOnly', 'SameSite=Strict',
+    'Path=/', 'HttpOnly',
+    isSecure ? 'SameSite=None' : 'SameSite=Lax',
     'Max-Age=' + (SESSION_MAX_AGE / 1000),
   ];
-  if (secure) parts.push('Secure');
+  if (isSecure) parts.push('Secure');
   res.setHeader('Set-Cookie', parts.join('; '));
 }
 
-function setCsrfCookie(res, secure) {
+function setCsrfCookie(res, secure, req) {
   const csrfToken = require('crypto').randomBytes(32).toString('hex');
+  const isSecure = _isReqSecure(secure, req);
   const parts = [
     'csrf_token=' + csrfToken,
-    'Path=/', 'SameSite=Strict',
+    'Path=/',
+    isSecure ? 'SameSite=None' : 'SameSite=Lax',
     'Max-Age=' + (SESSION_MAX_AGE / 1000),
   ];
-  if (secure) parts.push('Secure');
+  if (isSecure) parts.push('Secure');
   res.appendHeader('Set-Cookie', parts.join('; '));
   return csrfToken;
 }
@@ -81,8 +93,8 @@ function setCsrfCookie(res, secure) {
 // Expose helper for other modules
 function cookieHelpers(secure) {
   return {
-    setAuthCookie: (res, token) => setAuthCookie(res, token, secure),
-    setCsrfCookie: (res) => setCsrfCookie(res, secure),
+    setAuthCookie: (res, token, req) => setAuthCookie(res, token, secure, req),
+    setCsrfCookie: (res, req) => setCsrfCookie(res, secure, req),
   };
 }
 
@@ -116,8 +128,9 @@ module.exports = function (secure) {
 
     clearLoginAttempts(clientIP, username);
     const token = createSession(user.username, user.isAdmin);
-    setAuthCookie(res, token);
-    setCsrfCookie(res);
+    if (!token) return res.status(500).json({ error: '无法创建登录会话' });
+    setAuthCookie(res, token, secure, req);
+    setCsrfCookie(res, secure, req);
 
     res.json({ success: true, username: user.username, isAdmin: user.isAdmin });
   });
@@ -125,11 +138,11 @@ module.exports = function (secure) {
   router.post('/logout', (req, res) => {
     const cookies = parseCookies(req.headers.cookie);
     destroySession(cookies.auth_token);
-    const clearAttrs = 'Path=/; SameSite=Strict; Max-Age=0';
-    const secureAttr = secure ? '; Secure' : '';
+    const isSecure = _isReqSecure(secure, req);
+    const clearAttrs = isSecure ? 'Path=/; SameSite=None; Secure; Max-Age=0' : 'Path=/; SameSite=Lax; Max-Age=0';
     res.setHeader('Set-Cookie', [
-      'auth_token=; ' + clearAttrs + '; HttpOnly' + secureAttr,
-      'csrf_token=; ' + clearAttrs + secureAttr,
+      'auth_token=; ' + clearAttrs + '; HttpOnly',
+      'csrf_token=; ' + clearAttrs,
     ]);
     res.json({ success: true });
   });

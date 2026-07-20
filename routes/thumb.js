@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { safePath } = require('../utils/path-utils');
+const { resolveExistingPath } = require('../utils/path-utils');
 const { getThumb } = require('../services/thumbnail');
 
 const THUMB_SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']);
@@ -10,7 +10,7 @@ module.exports = function ({ config }) {
 
   router.get('/thumb', async (req, res, next) => {
     const relPath = req.query.path || '';
-    const filePath = safePath(relPath, config.rootDir);
+    const filePath = await resolveExistingPath(relPath, config.rootDir, { allowRoot: false });
 
     if (!filePath) {
       return res.status(403).json({ error: 'Access denied' });

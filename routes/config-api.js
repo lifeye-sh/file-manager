@@ -23,6 +23,7 @@ module.exports = function ({ config }) {
   router.post('/', requireAdmin, async (req, res) => {
     const { root, port, bind, whitelist } = req.body;
     const updates = {};
+    const warnings = [];
 
     if (root !== undefined) {
       if (!root || typeof root !== 'string') {
@@ -49,6 +50,7 @@ module.exports = function ({ config }) {
       }
       config.port = p;
       updates.port = config.port;
+      warnings.push('端口修改需要重启服务才能生效');
       console.log(`Port changed to: ${config.port} (requires restart to take effect)`);
     }
 
@@ -65,6 +67,7 @@ module.exports = function ({ config }) {
       }
       config.bindAddrs = addrs;
       updates.bind = config.bindAddrs;
+      warnings.push('绑定地址修改需要重启服务才能生效');
       console.log(`Bind addresses: ${config.bindAddrs.join(', ')} (requires restart to take effect)`);
     }
 
@@ -83,7 +86,7 @@ module.exports = function ({ config }) {
       return res.status(500).json({ error: '保存配置失败' });
     }
 
-    res.json({ root: config.rootDir, port: config.port, bind: config.bindAddrs, whitelist: config.whitelist });
+    res.json({ root: config.rootDir, port: config.port, bind: config.bindAddrs, whitelist: config.whitelist, warnings });
   });
 
   return router;

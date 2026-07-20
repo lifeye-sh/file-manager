@@ -49,6 +49,7 @@
         </select>
       </div>
       <div class="toolbar-right">
+        <a href="/ai-workbench.html" target="_blank" rel="noopener" class="btn-toolbar" title="在新页面打开 Infinite Canvas" style="text-decoration:none">🎨 Infinite Canvas</a>
         <button id="new-folder-btn" class="btn-toolbar" title="新建文件夹">📂+</button>
 	        <button id="upload-btn" class="btn-toolbar" title="上传文件">⬆</button>
 	        <input type="file" id="upload-input" class="upload-hidden" multiple>
@@ -82,6 +83,7 @@
         <span id="image-counter" class="image-counter hidden"></span>
         <div class="preview-actions">
           <a id="preview-edit" class="btn-icon hidden" title="编辑">&#x270E;</a>
+          <button id="preview-image-edit" class="btn-icon hidden" title="编辑图片">&#x1F5A8;</button>
           <button id="preview-rotate" class="btn-icon hidden" title="旋转">&#x21bb;</button>
           <button id="preview-autoplay" class="btn-icon hidden" title="自动播放">&#x25B6;</button>
           <input type="number" id="autoplay-interval" class="autoplay-interval hidden" value="3" min="1" max="60" title="播放间隔(秒)">
@@ -172,6 +174,10 @@
     <div id="ctx-rename" class="context-menu-item">✏️ 重命名</div>
     <div id="ctx-download" class="context-menu-item">⬇ 下载</div>
     <div id="ctx-move" class="context-menu-item">📁 移动到...</div>
+    <div id="ctx-canvas" class="context-menu-item">🎨 发送到 Infinite Canvas</div>
+    <div id="ctx-ai" class="context-menu-item ctx-has-sub">🤖 旧版 AI 工作流 ▸</div>
+    <div id="ctx-ai-sub" class="context-submenu hidden"><div class="ctx-sub-loading">加载中...</div></div>
+    <div id="ctx-batch-images" class="context-menu-item">🖼 批量图片处理</div>
     <div class="context-menu-sep"></div>
     <div id="ctx-delete" class="context-menu-item danger">🗑 删除</div>
   </div>
@@ -242,9 +248,246 @@
     </div>
   </div>
 
+  <!-- Multi-Image Workflow Dialog -->
+  <div id="ai-multi-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal" style="width: 560px;">
+      <div class="dialog-header">
+        <h3 id="ai-multi-title">AI 工作流 — 选择图片</h3>
+        <button id="ai-multi-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px;max-height:60vh;overflow-y:auto;">
+        <div id="ai-multi-hint" class="settings-hint"></div>
+        <div id="ai-multi-slots" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <span id="ai-multi-error" class="settings-error"></span>
+      </div>
+      <div class="dialog-footer">
+        <button id="ai-multi-cancel" class="btn-secondary">取消</button>
+        <button id="ai-multi-confirm" class="btn-primary">提交任务</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Editor -->
+  <div id="image-edit-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal" style="width: 90vw;max-width: 1100px;height: 88vh;display:flex;flex-direction:column;">
+      <div class="dialog-header">
+        <h3 id="image-edit-title">编辑图片</h3>
+        <button id="image-edit-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+        <button class="btn-secondary" id="ie-rotate-l" title="逆时针旋转90°">↺ 90°</button>
+        <button class="btn-secondary" id="ie-rotate-r" title="顺时针旋转90°">↻ 90°</button>
+        <button class="btn-secondary" id="ie-flip-h" title="水平翻转">⇋ 水平翻转</button>
+        <button class="btn-secondary" id="ie-flip-v" title="垂直翻转">⇅ 垂直翻转</button>
+        <button class="btn-secondary" id="ie-crop" title="裁剪">⬕ 裁剪</button>
+        <button class="btn-secondary" id="ie-crop-apply" title="应用裁剪" style="display:none">✓ 应用裁剪</button>
+        <button class="btn-secondary" id="ie-crop-cancel" title="取消裁剪" style="display:none">✕ 取消</button>
+        <button class="btn-secondary" id="ie-reset" title="重置">↺ 重置</button>
+        <span style="flex:1"></span>
+        <span id="ie-info" class="settings-hint" style="margin-right:8px"></span>
+      </div>
+      <div id="ie-canvas-wrap" style="flex:1;overflow:auto;background:#1e1e2e;display:flex;align-items:center;justify-content:center;position:relative">
+        <canvas id="ie-canvas" style="max-width:100%;max-height:100%"></canvas>
+      </div>
+      <div class="dialog-footer" style="display:flex;gap:8px;align-items:center">
+        <label class="settings-hint" style="display:flex;align-items:center;gap:4px">格式
+          <select id="ie-format" class="settings-input" style="width:auto;font-family:inherit">
+            <option value="image/png">PNG</option>
+            <option value="image/jpeg">JPEG</option>
+            <option value="image/webp">WebP</option>
+          </select>
+        </label>
+        <label class="settings-hint" style="display:flex;align-items:center;gap:4px">质量
+          <input type="range" id="ie-quality" min="0.1" max="1" step="0.05" value="0.92" style="width:90px">
+        </label>
+        <span style="flex:1"></span>
+        <span id="ie-error" class="settings-error"></span>
+        <button id="ie-save-as" class="btn-secondary">另存为</button>
+        <button id="ie-save" class="btn-primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch Image Processing -->
+  <div id="batch-img-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal" style="width:96vw;max-width:1200px;height:90vh;display:flex;flex-direction:column;">
+      <div class="dialog-header">
+        <h3 id="batch-img-title">批量图片处理</h3>
+        <button id="batch-img-close" class="btn-icon" title="关闭">&times;</button>
+      </div>
+      <div style="flex:1;display:flex;min-height:0;">
+        <!-- Left: image list -->
+        <div id="batch-list" style="width:240px;border-right:1px solid var(--border);overflow-y:auto;padding:8px;"></div>
+        <!-- Center: preview -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+          <div style="display:flex;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);align-items:center">
+            <span class="settings-hint" style="flex:1" id="bi-preview-name"></span>
+            <button type="button" class="btn-secondary" id="bi-compare" style="padding:3px 10px;font-size:12px" title="按住查看原图">按住对比原图</button>
+            <button type="button" class="btn-secondary" id="bi-reset-focal" style="padding:3px 10px;font-size:12px;display:none">清除焦点</button>
+          </div>
+          <div id="batch-preview-wrap" style="flex:1;background:#1e1e2e;display:flex;align-items:center;justify-content:center;overflow:auto;position:relative;cursor:crosshair;">
+            <div class="settings-hint">选择左侧图片预览</div>
+          </div>
+          <div id="batch-preview-info" class="settings-hint" style="padding:4px 10px;border-top:1px solid var(--border)"></div>
+        </div>
+        <!-- Right: settings -->
+        <div style="width:300px;border-left:1px solid var(--border);overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:14px;">
+          <div class="settings-field"><label>尺寸单位</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="bi-unit" class="settings-input" style="width:auto;font-family:inherit">
+                <option value="px">像素 px</option>
+                <option value="pct">百分比 %</option>
+              </select>
+              <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" id="bi-hq"> 高质量缩放</label>
+            </div>
+          </div>
+          <div class="settings-field"><label id="bi-width-label">宽度 (px)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="bi-width" class="settings-input" placeholder="如 800" min="1" style="flex:1;font-family:var(--mono)">
+              <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" id="bi-width-auto"> 自动</label>
+            </div>
+          </div>
+          <div class="settings-field"><label id="bi-height-label">高度 (px)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="bi-height" class="settings-input" placeholder="如 800" min="1" style="flex:1;font-family:var(--mono)">
+              <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" id="bi-height-auto"> 自动</label>
+            </div>
+          </div>
+          <div class="settings-field"><label>裁剪模式</label>
+            <select id="bi-crop" class="settings-input" style="font-family:inherit">
+              <option value="stretch">拉伸（变形）</option>
+              <option value="crop" selected>裁剪（居中焦点）</option>
+              <option value="pad">留白（填充背景）</option>
+            </select>
+          </div>
+          <div class="settings-field" id="bi-pad-field" style="display:none"><label>留白背景色</label>
+            <input type="color" id="bi-pad-color" value="#ffffff" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg-tertiary)">
+          </div>
+          <div class="settings-field"><label>输出格式</label>
+            <select id="bi-format" class="settings-input" style="font-family:inherit">
+              <option value="keep">保持原格式</option>
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/webp">WebP</option>
+              <option value="image/png">PNG</option>
+              <option value="image/avif">AVIF</option>
+            </select>
+          </div>
+          <div class="settings-field"><label>质量 <span id="bi-quality-val" style="color:var(--muted)">80</span>%</label>
+            <input type="range" id="bi-quality" min="1" max="100" value="80" style="width:100%">
+          </div>
+          <div class="settings-field"><label>输出文件名模板</label>
+            <input type="text" id="bi-rename" class="settings-input" value="ORIGINAL-NAME_xxx" maxlength="160" style="font-family:var(--mono)">
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+              <span class="settings-hint">编号起点</span>
+              <input type="number" id="bi-rename-start" class="settings-input" value="0" min="0" style="width:90px;font-family:var(--mono)">
+            </div>
+          </div>
+          <div class="settings-field"><label>焦点方式（裁剪模式生效）</label>
+            <select id="bi-focal" class="settings-input" style="font-family:inherit">
+              <option value="center">中心</option>
+              <option value="smart">智能焦点（自动）</option>
+              <option value="manual">手动（点击预览设点）</option>
+            </select>
+            <span class="settings-hint">智能焦点用 smartcrop 分析；手动在中间预览图点击设点</span>
+          </div>
+          <div class="settings-field"><label>预处理（全部图片）</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-secondary" id="bi-rot-l" style="padding:5px 10px">↺ 90°</button>
+              <button type="button" class="btn-secondary" id="bi-rot-r" style="padding:5px 10px">↻ 90°</button>
+              <button type="button" class="btn-secondary" id="bi-flip-h" style="padding:5px 10px">⇋ 水平</button>
+              <button type="button" class="btn-secondary" id="bi-flip-v" style="padding:5px 10px">⇅ 垂直</button>
+              <button type="button" class="btn-secondary" id="bi-prep-reset" style="padding:5px 10px">重置</button>
+            </div>
+            <span class="settings-hint" id="bi-prep-info">无</span>
+          </div>
+          <div class="settings-field"><label>水印图层</label>
+            <div id="bi-wm-layers" style="display:flex;flex-direction:column;gap:6px"></div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button type="button" class="btn-secondary" id="bi-wm-add-text" style="padding:4px 8px;font-size:12px">＋ 文字</button>
+              <button type="button" class="btn-secondary" id="bi-wm-add-img" style="padding:4px 8px;font-size:12px">＋ 图片</button>
+            </div>
+            <input type="file" id="bi-wm-img-input" accept="image/*" style="display:none">
+          </div>
+          <div class="settings-field">
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="bi-border-enable"> 边框</label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">
+              <input type="color" id="bi-border-color" value="#000000" style="width:36px;height:32px">
+              <input type="number" id="bi-border-w" class="settings-input" value="4" min="0" style="width:70px;font-family:var(--mono)" title="边框厚度px">
+              <span class="settings-hint">px 厚</span>
+              <input type="number" id="bi-border-radius" class="settings-input" value="0" min="0" style="width:60px;font-family:var(--mono)" title="圆角半径px">
+              <span class="settings-hint">圆角</span>
+            </div>
+          </div>
+          <div class="settings-field">
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="bi-keep-exif"> 保留元数据 (EXIF)</label>
+            <span class="settings-hint">仅 JPEG→JPEG 有效；默认清除以减小体积</span>
+          </div>
+          <div class="settings-field"><label>预设</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <select id="bi-preset" class="settings-input" style="flex:1;min-width:100px;font-family:inherit"><option value="">— 选择预设 —</option></select>
+              <button type="button" class="btn-secondary" id="bi-preset-save" style="padding:5px 10px">存为</button>
+              <button type="button" class="btn-secondary" id="bi-preset-del" style="padding:5px 10px">删</button>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+              <button type="button" class="btn-secondary" id="bi-preset-export" style="padding:4px 8px;font-size:12px">导出预设</button>
+              <button type="button" class="btn-secondary" id="bi-preset-import" style="padding:4px 8px;font-size:12px">导入预设</button>
+              <button type="button" class="btn-secondary" id="bi-history" style="padding:4px 8px;font-size:12px">历史</button>
+              <input type="file" id="bi-preset-import-input" accept="application/json,.json" style="display:none">
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+              <span class="settings-hint" style="font-size:11px">共享:</span>
+              <select id="bi-shared-preset" class="settings-input" style="flex:1;min-width:90px;font-family:inherit;font-size:12px"><option value="">— 团队预设 —</option></select>
+              <button type="button" class="btn-secondary" id="bi-shared-load" style="padding:4px 8px;font-size:12px">载入</button>
+              <button type="button" class="btn-secondary" id="bi-shared-publish" style="padding:4px 8px;font-size:12px" title="把当前设置发布为共享预设">发布</button>
+              <button type="button" class="btn-secondary" id="bi-shared-default" style="padding:4px 8px;font-size:12px" title="把选中的共享预设设为所有人的默认">设为默认</button>
+            </div>
+          </div>
+          <div class="settings-field"><label>输出文件名预览</label>
+            <div id="bi-name-preview" class="settings-hint" style="font-family:var(--mono);word-break:break-all"></div>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="settings-hint">输出
+          <select id="bi-output" class="settings-input" style="width:auto;font-family:inherit">
+            <option value="dir">保存到目录</option>
+            <option value="zip">ZIP 下载</option>
+          </select>
+        </label>
+        <span id="bi-target-row" style="display:flex;gap:6px;align-items:center">
+          <span class="settings-hint">目标目录:</span>
+          <span id="bi-target-path" class="settings-hint" style="font-family:var(--mono);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/</span>
+          <button class="btn-secondary" id="bi-pick-dir" style="padding:5px 10px">选择</button>
+        </span>
+        <span style="flex:1"></span>
+        <div id="bi-progress-wrap" style="display:none;align-items:center;gap:8px">
+          <progress id="bi-progress" value="0" max="1" style="width:160px"></progress>
+          <span id="bi-progress-text" class="settings-hint">0/0</span>
+          <button class="btn-secondary" id="bi-cancel" style="padding:5px 10px">取消</button>
+        </div>
+        <span id="bi-error" class="settings-error"></span>
+        <button id="bi-to-ai" class="btn-secondary" style="display:none;padding:6px 12px" title="用处理结果跑 AI 工作流">→ AI 工作流</button>
+        <button id="bi-start" class="btn-primary">开始处理</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch History -->
+  <div id="bi-history-overlay" class="preview-overlay hidden">
+    <div class="dialog-modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column">
+      <div class="dialog-header"><h3>批量处理历史</h3><button id="bi-history-close" class="btn-icon" title="关闭">&times;</button></div>
+      <div class="dialog-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px" id="bi-history-list"></div>
+      <div class="dialog-footer">
+        <span class="settings-hint">点击「载入」恢复该次设置</span>
+        <button class="btn-secondary" id="bi-history-clear">清空历史</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notifications -->
   <div id="toast-container" class="toast-container"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
   <script src="/app.js"></script>

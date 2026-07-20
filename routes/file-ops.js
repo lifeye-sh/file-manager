@@ -1,7 +1,12 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { safePath, sanitizeName, pathExists } = require('../utils/path-utils');
+const {
+  resolveExistingPath,
+  resolveNewPath,
+  sanitizeName,
+  pathExists,
+} = require('../utils/path-utils');
 
 const UPLOAD_BODY_LIMIT = '100mb';
 const UPLOAD_MAX_CONCURRENCY = 2;
@@ -86,12 +91,12 @@ module.exports = function ({ config }) {
     const safeName = sanitizeName(name);
     if (!safeName) return res.status(400).json({ error: '文件夹名称包含无效字符' });
 
-    const parentPath = safePath(relPath || '', rootDir());
+    const parentPath = await resolveExistingPath(relPath || '', rootDir());
     if (!parentPath) return res.status(403).json({ error: 'Access denied' });
 
-    const newPath = path.join(parentPath, safeName);
+    const newPath = await resolveNewPath(relPath || '', safeName, rootDir());
+    if (!newPath) return res.status(403).json({ error: 'Access denied' });
     const newRelPath = path.relative(rootDir(), newPath).replace(/\\/g, '/');
-    if (!safePath(newRelPath, rootDir())) return res.status(403).json({ error: 'Access denied' });
 
     if (await pathExists(newPath)) return res.status(409).json({ error: '文件夹已存在' });
 
@@ -113,14 +118,13 @@ module.exports = function ({ config }) {
     const safeName = sanitizeName(newName);
     if (!safeName) return res.status(400).json({ error: '名称包含无效字符' });
 
-    const sourcePath = safePath(relPath, rootDir());
+    const sourcePath = await resolveExistingPath(relPath, rootDir(), { allowRoot: false });
     if (!sourcePath) return res.status(403).json({ error: 'Access denied' });
-    if (!(await pathExists(sourcePath))) return res.status(404).json({ error: '文件或文件夹不存在' });
 
-    const parentDir = path.dirname(sourcePath);
-    const destPath = path.join(parentDir, safeName);
+    const parentRel = path.dirname(relPath).replace(/\\/g, '/');
+    const destPath = await resolveNewPath(parentRel === '.' ? '' : parentRel, safeName, rootDir());
+    if (!destPath) return res.status(403).json({ error: 'Access denied' });
     const destRelPath = path.relative(rootDir(), destPath).replace(/\\/g, '/');
-    if (!safePath(destRelPath, rootDir())) return res.status(403).json({ error: 'Access denied' });
     if (await pathExists(destPath)) return res.status(409).json({ error: '目标名称已存在' });
 
     try {
@@ -137,9 +141,8 @@ module.exports = function ({ config }) {
     const { path: relPath } = req.body;
     if (!relPath) return res.status(400).json({ error: '请指定要删除的路径' });
 
-    const targetPath = safePath(relPath, rootDir());
+    const targetPath = await resolveExistingPath(relPath, rootDir(), { allowRoot: false });
     if (!targetPath) return res.status(403).json({ error: 'Access denied' });
-    if (!(await pathExists(targetPath))) return res.status(404).json({ error: '文件或文件夹不存在' });
 
     try {
       await fs.promises.rm(targetPath, { recursive: true, force: true });
@@ -157,18 +160,18 @@ module.exports = function ({ config }) {
       return res.status(400).json({ error: '请提供源路径和目标目录' });
     }
 
-    const sourcePath = safePath(relPath, rootDir());
+    const sourcePath = await resolveExistingPath(relPath, rootDir(), { allowRoot: false });
     if (!sourcePath) return res.status(403).json({ error: 'Access denied' });
-    if (!(await pathExists(sourcePath))) return res.status(404).json({ error: '源文件或文件夹不存在' });
 
-    const destDirPath = safePath(targetDir, rootDir());
+    const destDirPath = await resolveExistingPath(targetDir, rootDir());
     if (!destDirPath) return res.status(403).json({ error: '目标目录访问被拒绝' });
-    if (!(await pathExists(destDirPath))) return res.status(404).json({ error: '目标目录不存在' });
+    const destDirStats = await fs.promises.stat(destDirPath);
+    if (!destDirStats.isDirectory()) return res.status(400).json({ error: '目标不是目录' });
 
     const basename = path.basename(sourcePath);
-    const destPath = path.join(destDirPath, basename);
+    const destPath = await resolveNewPath(targetDir, basename, rootDir());
+    if (!destPath) return res.status(403).json({ error: 'Access denied' });
     const destRelPath = path.relative(rootDir(), destPath).replace(/\\/g, '/');
-    if (!safePath(destRelPath, rootDir())) return res.status(403).json({ error: 'Access denied' });
     if (await pathExists(destPath)) return res.status(409).json({ error: '目标位置已存在同名文件或文件夹' });
 
     try {
@@ -186,9 +189,8 @@ module.exports = function ({ config }) {
     if (!relPath) return res.status(400).json({ error: '请指定文件路径' });
     if (typeof content !== 'string') return res.status(400).json({ error: '请提供文件内容' });
 
-    const filePath = safePath(relPath, rootDir());
+    const filePath = await resolveExistingPath(relPath, rootDir(), { allowRoot: false });
     if (!filePath) return res.status(403).json({ error: 'Access denied' });
-    if (!(await pathExists(filePath))) return res.status(404).json({ error: '文件不存在' });
 
     try {
       await fs.promises.writeFile(filePath, content, 'utf-8');
@@ -218,16 +220,17 @@ module.exports = function ({ config }) {
 
       const { fields, files } = parsed;
       const uploadDirRel = fields.uploadDir || '';
-      const uploadDir = safePath(uploadDirRel, rootDir());
+      const uploadDir = await resolveExistingPath(uploadDirRel, rootDir());
       if (!uploadDir) return res.status(403).json({ error: 'Access denied' });
-      if (!(await pathExists(uploadDir))) return res.status(404).json({ error: '目标目录不存在' });
 
       const results = await Promise.all(files.map(async (file) => {
-        const destPath = path.join(uploadDir, file.filename);
-        const destRel = path.relative(rootDir(), destPath).replace(/\\/g, '/');
-        if (!safePath(destRel, rootDir())) {
-          return { name: file.filename, error: 'Access denied' };
+        const safeName = sanitizeName(file.filename);
+        if (!safeName) {
+          return { name: file.filename, error: '文件名包含无效字符' };
         }
+        const destPath = await resolveNewPath(uploadDirRel, safeName, rootDir());
+        if (!destPath) return { name: file.filename, error: 'Access denied' };
+        const destRel = path.relative(rootDir(), destPath).replace(/\\/g, '/');
         try {
           await fs.promises.writeFile(destPath, file.buffer);
           console.log(`[upload] ${destRel} (${file.size} bytes)`);

@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { getMimeType } = require('../utils/mime');
-const { safePath } = require('../utils/path-utils');
+const { resolveExistingPath } = require('../utils/path-utils');
 
 async function browse(req, res, rootDir) {
   const relPath = req.query.path || '';
-  const dirPath = safePath(relPath, rootDir);
+  const dirPath = await resolveExistingPath(relPath, rootDir);
 
   if (!dirPath) {
     return res.status(403).json({ error: 'Access denied' });
@@ -30,7 +30,7 @@ async function browse(req, res, rootDir) {
 
   const result = (await Promise.all(entries.map(async (entry) => {
     let entryStats = null;
-    try { entryStats = await fs.promises.stat(path.join(dirPath, entry.name)); }
+    try { entryStats = await fs.promises.lstat(path.join(dirPath, entry.name)); }
     catch (_) { }
 
     return {
@@ -51,21 +51,29 @@ async function browse(req, res, rootDir) {
   res.json({ path: relPath.replace(/\\/g, '/'), parent, entries: result });
 }
 
-function file(req, res, rootDir) {
+async function file(req, res, rootDir) {
   const relPath = req.query.path || '';
-  const filePath = safePath(relPath, rootDir);
+  const filePath = await resolveExistingPath(relPath, rootDir, { allowRoot: false });
 
   if (!filePath) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
-  fs.stat(filePath, (err, stats) => {
-    if (err || !stats.isFile()) {
-      return res.status(404).json({ error: 'File not found' });
-    }
+  let stats;
+  try { stats = await fs.promises.stat(filePath); }
+  catch (_) { return res.status(404).json({ error: 'File not found' }); }
+  if (!stats.isFile()) return res.status(404).json({ error: 'File not found' });
 
-    const mimeType = getMimeType(filePath);
-    const fileSize = stats.size;
+  const mimeType = getMimeType(filePath);
+  const fileSize = stats.size;
+    // 1-hour cache for standard files (images, PDFs, etc.)
+    const isCacheable = ['image/', 'video/', 'audio/', 'application/pdf', 'text/'].some(p => mimeType.startsWith(p));
+    const cacheControl = isCacheable ? 'public, max-age=3600' : 'no-cache';
+
+    const baseHeaders = {
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': cacheControl,
+    };
 
     const range = req.headers.range;
     if (range) {
@@ -75,22 +83,21 @@ function file(req, res, rootDir) {
       const chunkSize = end - start + 1;
 
       res.writeHead(206, {
+        ...baseHeaders,
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
         'Content-Type': mimeType,
       });
 
-      fs.createReadStream(filePath, { start, end }).pipe(res);
-    } else {
-      res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-Type': mimeType,
-        'Accept-Ranges': 'bytes',
-      });
-      fs.createReadStream(filePath).pipe(res);
-    }
-  });
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, {
+      ...baseHeaders,
+      'Content-Length': fileSize,
+      'Content-Type': mimeType,
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
 }
 
 module.exports = { browse, file };

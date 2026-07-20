@@ -12,9 +12,9 @@ module.exports = function ({ config }) {
     }
   });
 
-  router.get('/file', (req, res, next) => {
+  router.get('/file', async (req, res, next) => {
     try {
-      file(req, res, config.rootDir);
+      await file(req, res, config.rootDir);
     } catch (err) {
       next(err);
     }

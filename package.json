@@ -4,10 +4,13 @@
   "description": "Web-based file manager with multimedia preview support",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test",
+    "test:sidecar": "python -m unittest discover -s test -p test_infinite_canvas_sidecar.py -v"
   },
   "dependencies": {
     "express": "^4.21.0",
+    "compression": "^1.7.5",
     "sharp": "^0.34.5",
     "ws": "^8.20.0"
   }

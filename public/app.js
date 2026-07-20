@@ -15,7 +15,7 @@ let _csrfToken = '';
 
 async function fetchCsrfToken() {
   try {
-    const res = await _origFetch('/api/csrf-token', { credentials: 'same-origin' });
+    const res = await _origFetch('/api/csrf-token', { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       _csrfToken = data.token;
@@ -27,7 +27,7 @@ async function fetchCsrfToken() {
 
 async function checkAuth() {
   try {
-    const res = await _origFetch('/api/auth/session', { credentials: 'same-origin' });
+    const res = await _origFetch('/api/auth/session', { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       state.user = data;
@@ -48,7 +48,7 @@ async function doLogout() {
   try {
     const headers = {};
     if (_csrfToken) headers['X-CSRF-Token'] = _csrfToken;
-    await _origFetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers });
+    await _origFetch('/api/auth/logout', { method: 'POST', credentials: 'include', headers });
   } catch (_) {}
   redirectToLogin();
 }
@@ -63,7 +63,7 @@ function authFetch(url, options = {}) {
 
 async function doAuthFetch(url, options = {}, isRetry) {
   const method = (options.method || 'GET').toUpperCase();
-  const opts = { ...options, credentials: options.credentials || 'same-origin' };
+  const opts = { ...options, credentials: options.credentials || 'include' };
 
   // Attach CSRF token to state-changing requests
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
@@ -146,9 +146,12 @@ const dom = {
   passwordClose: $('#password-close'),
   // File operations
   contextMenu: $('#context-menu'),
+  ctxCanvas: $('#ctx-canvas'),
   ctxRename: $('#ctx-rename'),
   ctxDownload: $('#ctx-download'),
   ctxMove: $('#ctx-move'),
+  ctxAi: $('#ctx-ai'),
+  ctxAiSub: $('#ctx-ai-sub'),
   ctxDelete: $('#ctx-delete'),
   dialogOverlay: $('#dialog-overlay'),
   dialogTitle: $('#dialog-title'),
@@ -182,6 +185,109 @@ const dom = {
   batchRenameConfirm: $('#batch-rename-confirm'),
   batchRenameCancel: $('#batch-rename-cancel'),
   batchRenameClose: $('#batch-rename-close'),
+  // AI multi-image workflow dialog
+  aiMultiOverlay: $('#ai-multi-overlay'),
+  aiMultiTitle: $('#ai-multi-title'),
+  aiMultiHint: $('#ai-multi-hint'),
+  aiMultiSlots: $('#ai-multi-slots'),
+  aiMultiError: $('#ai-multi-error'),
+  aiMultiClose: $('#ai-multi-close'),
+  aiMultiCancel: $('#ai-multi-cancel'),
+  aiMultiConfirm: $('#ai-multi-confirm'),
+  // Batch image processing
+  ctxBatchImages: $('#ctx-batch-images'),
+  batchImgOverlay: $('#batch-img-overlay'),
+  batchImgTitle: $('#batch-img-title'),
+  batchImgClose: $('#batch-img-close'),
+  batchList: $('#batch-list'),
+  batchPreviewWrap: $('#batch-preview-wrap'),
+  batchPreviewInfo: $('#batch-preview-info'),
+  biWidth: $('#bi-width'),
+  biWidthAuto: $('#bi-width-auto'),
+  biHeight: $('#bi-height'),
+  biHeightAuto: $('#bi-height-auto'),
+  biCrop: $('#bi-crop'),
+  biPadField: $('#bi-pad-field'),
+  biPadColor: $('#bi-pad-color'),
+  biFormat: $('#bi-format'),
+  biQuality: $('#bi-quality'),
+  biQualityVal: $('#bi-quality-val'),
+  biRename: $('#bi-rename'),
+  biRenameStart: $('#bi-rename-start'),
+  biNamePreview: $('#bi-name-preview'),
+  biOutput: $('#bi-output'),
+  biTargetRow: $('#bi-target-row'),
+  biTargetPath: $('#bi-target-path'),
+  biPickDir: $('#bi-pick-dir'),
+  biProgressWrap: $('#bi-progress-wrap'),
+  biProgress: $('#bi-progress'),
+  biProgressText: $('#bi-progress-text'),
+  biCancel: $('#bi-cancel'),
+  biError: $('#bi-error'),
+  biStart: $('#bi-start'),
+  // P1 extras
+  biFocal: $('#bi-focal'),
+  biRotL: $('#bi-rot-l'),
+  biRotR: $('#bi-rot-r'),
+  biFlipH: $('#bi-flip-h'),
+  biFlipV: $('#bi-flip-v'),
+  biPrepReset: $('#bi-prep-reset'),
+  biPrepInfo: $('#bi-prep-info'),
+  biWmLayers: $('#bi-wm-layers'),
+  biWmAddText: $('#bi-wm-add-text'),
+  biWmAddImg: $('#bi-wm-add-img'),
+  biWmImgInput: $('#bi-wm-img-input'),
+  biBorderEnable: $('#bi-border-enable'),
+  biBorderColor: $('#bi-border-color'),
+  biBorderW: $('#bi-border-w'),
+  biBorderRadius: $('#bi-border-radius'),
+  biKeepExif: $('#bi-keep-exif'),
+  biPreset: $('#bi-preset'),
+  biPresetSave: $('#bi-preset-save'),
+  biPresetDel: $('#bi-preset-del'),
+  biCompare: $('#bi-compare'),
+  biResetFocal: $('#bi-reset-focal'),
+  biPreviewName: $('#bi-preview-name'),
+  // P2 extras
+  biUnit: $('#bi-unit'),
+  biHq: $('#bi-hq'),
+  biWidthLabel: $('#bi-width-label'),
+  biHeightLabel: $('#bi-height-label'),
+  biToAi: $('#bi-to-ai'),
+  // P3 extras
+  biPresetExport: $('#bi-preset-export'),
+  biPresetImport: $('#bi-preset-import'),
+  biPresetImportInput: $('#bi-preset-import-input'),
+  biHistory: $('#bi-history'),
+  biHistoryOverlay: $('#bi-history-overlay'),
+  biHistoryClose: $('#bi-history-close'),
+  biHistoryList: $('#bi-history-list'),
+  biHistoryClear: $('#bi-history-clear'),
+  biSharedPreset: $('#bi-shared-preset'),
+  biSharedLoad: $('#bi-shared-load'),
+  biSharedPublish: $('#bi-shared-publish'),
+  biSharedDefault: $('#bi-shared-default'),
+  // Image editor
+  previewImageEdit: $('#preview-image-edit'),
+  imgEditOverlay: $('#image-edit-overlay'),
+  imgEditTitle: $('#image-edit-title'),
+  imgEditClose: $('#image-edit-close'),
+  ieCanvas: $('#ie-canvas'),
+  ieCanvasWrap: $('#ie-canvas-wrap'),
+  ieRotateL: $('#ie-rotate-l'),
+  ieRotateR: $('#ie-rotate-r'),
+  ieFlipH: $('#ie-flip-h'),
+  ieFlipV: $('#ie-flip-v'),
+  ieCrop: $('#ie-crop'),
+  ieCropApply: $('#ie-crop-apply'),
+  ieCropCancel: $('#ie-crop-cancel'),
+  ieReset: $('#ie-reset'),
+  ieInfo: $('#ie-info'),
+  ieFormat: $('#ie-format'),
+  ieQuality: $('#ie-quality'),
+  ieError: $('#ie-error'),
+  ieSave: $('#ie-save'),
+  ieSaveAs: $('#ie-save-as'),
 };
 
 // === File Type Helpers ===
@@ -243,6 +349,28 @@ async function apiBrowse(path) {
     const err = new Error(data.error || `HTTP ${res.status}`);
     console.error(`[apiBrowse] path="${path}" failed:`, err.message);
     throw err;
+  }
+  return res.json();
+}
+
+async function apiGetJson(url) {
+  const res = await authFetch(url);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function apiPostJson(url, body) {
+  const res = await authFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
   }
   return res.json();
 }
@@ -959,6 +1087,7 @@ async function openPreview(entry) {
   dom.previewDownload.href = fileUrl;
   dom.previewDownload.download = entry.name;
   dom.previewEdit.classList.toggle('hidden', category !== 'text');
+  dom.previewImageEdit.classList.toggle('hidden', category !== 'image');
   dom.previewOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 
@@ -1005,6 +1134,7 @@ function closePreview() {
     state._imageNav = null;
   }
   dom.previewEdit.classList.add('hidden');
+  dom.previewImageEdit.classList.add('hidden');
   dom.previewRotate.classList.add('hidden');
   dom.previewAutoPlay.classList.add('hidden');
   dom.autoplayInterval.classList.add('hidden');
@@ -1375,7 +1505,7 @@ async function renderMarkdownPreview(url) {
   viewArea.id = 'text-view';
   const mdContent = document.createElement('div');
   mdContent.className = 'markdown-body';
-  mdContent.innerHTML = marked.parse(text);
+  mdContent.innerHTML = DOMPurify.sanitize(marked.parse(text));
   viewArea.appendChild(mdContent);
 
   // Edit mode (same as text preview)
@@ -1420,7 +1550,7 @@ async function renderMarkdownPreview(url) {
     try {
       const fp = getFilePath(state.previewFile);
       await apiSave(fp, textarea.value);
-      mdContent.innerHTML = marked.parse(textarea.value);
+      mdContent.innerHTML = DOMPurify.sanitize(marked.parse(textarea.value));
       showToast('文件已保存', 'success');
       exitEdit();
     } catch (err) {
@@ -1618,6 +1748,9 @@ async function saveSettings() {
     dom.rootPath.textContent = result.root;
     closeSettings();
     const msgs = ['配置已保存'];
+    if (result.warnings && result.warnings.length > 0) {
+      result.warnings.forEach(w => msgs.push(w));
+    }
     if (config.whitelist && config.whitelist.length > 0) msgs.push(`白名单: ${config.whitelist.join(', ')}`);
     else msgs.push('白名单: 允许所有');
     showToast(msgs.join('；'), 'success');
@@ -2062,20 +2195,1781 @@ function showContextMenu(e, entry) {
 
   const menu = dom.contextMenu;
   menu.classList.remove('hidden');
-  menu.style.left = Math.min(e.clientX, window.innerWidth - 200) + 'px';
-  menu.style.top = Math.min(e.clientY, window.innerHeight - 220) + 'px';
+  const x = Math.min(e.clientX, window.innerWidth - 200);
+  const y = Math.min(e.clientY, window.innerHeight - 260);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
 
   dom.ctxDownload.classList.toggle('hidden', entry.type === 'directory');
+  const isImg = !entry || entry.type === 'directory' || getFileCategory(entry) !== 'image';
+  dom.ctxCanvas.classList.toggle('hidden', isImg);
+  dom.ctxAi.classList.toggle('hidden', isImg);
+  dom.ctxBatchImages.classList.toggle('hidden', isImg);
+  dom.ctxAiSub.classList.add('hidden');
 
   // Highlight target card
   document.querySelectorAll('.file-card.context-target').forEach(el => el.classList.remove('context-target'));
   e.currentTarget.classList.add('context-target');
 }
 
+async function loadAiSubmenu() {
+  const sub = dom.ctxAiSub;
+  sub.classList.remove('hidden');
+  sub.innerHTML = '<div class="ctx-sub-loading">加载中...</div>';
+  sub.style.left = '0px';
+  sub.style.top = '0px';
+  let workflows = [];
+  try {
+    // Always fetch fresh workflows when hovering the submenu (no caching)
+    const data = await apiGetJson('/api/ai/workflows-for-images');
+    workflows = data.workflows || [];
+  } catch (err) {
+    sub.innerHTML = `<div class="ctx-sub-empty" style="color:var(--danger)">加载失败: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  if (!workflows.length) {
+    sub.innerHTML = '<div class="ctx-sub-empty">无图片输入类型的工作流</div>';
+    return;
+  }
+  let h = '';
+  workflows.forEach(w => {
+    const tag = w.imageInputCount > 1 ? ` <span style="color:var(--accent);font-size:11px">·${w.imageInputCount}图</span>` : '';
+    h += `<div class="ctx-sub-item" data-wfid="${escapeHtml(w.id)}" data-count="${w.imageInputCount||1}">${escapeHtml(w.name)}${tag}</div>`;
+  });
+  sub.innerHTML = h;
+  // stash the workflow metadata for the click handler
+  state._aiWfList = workflows;
+  // position submenu to the right of the AI item (or left if near right edge)
+  const menuRect = dom.contextMenu.getBoundingClientRect();
+  const aiTop = dom.ctxAi.getBoundingClientRect().top;
+  const subWidth = 200;
+  if (menuRect.right + subWidth > window.innerWidth) {
+    sub.style.left = (-subWidth + 4) + 'px';
+  } else {
+    sub.style.left = (menuRect.width - 2) + 'px';
+  }
+  sub.style.top = (aiTop - menuRect.top) + 'px';
+}
+
+function hideAiSubmenu() {
+  dom.ctxAiSub.classList.add('hidden');
+}
+
+dom.ctxAi.addEventListener('mouseenter', () => {
+  loadAiSubmenu();
+});
+dom.ctxCanvas.addEventListener('click', async () => {
+  if (!contextTarget) return;
+  const filePath = getFilePath(contextTarget);
+  hideContextMenu();
+  try {
+    const result = await apiPostJson('/api/ai/infinite-canvas/imports', {
+      fileRef: { rootId: 'main', path: filePath },
+    });
+    if (!result.canvasAsset || !result.canvasAsset.url) throw new Error('画布未返回素材引用');
+    showToast('图片已安全发送到 Infinite Canvas 素材库', 'success');
+    const url = `/ai-workbench.html?fileManagerAsset=${encodeURIComponent(result.canvasAsset.url)}`;
+    window.open(url, '_blank', 'noopener');
+  } catch (err) {
+    showToast('发送到 Infinite Canvas 失败: ' + err.message, 'error');
+  }
+});
+dom.ctxAiSub.addEventListener('mouseleave', (e) => {
+  // Check if mouse actually leaves the submenu (not moving to a child)
+  if (!dom.ctxAiSub.contains(e.relatedTarget) && !dom.ctxAi.contains(e.relatedTarget)) {
+    hideAiSubmenu();
+  }
+});
+dom.ctxAiSub.addEventListener('click', async (e) => {
+  const item = e.target.closest('.ctx-sub-item');
+  if (!item) return;
+  const wfId = item.dataset.wfid;
+  if (!wfId || !contextTarget) return;
+  const wfMeta = (state._aiWfList || []).find(w => w.id === wfId) || { imageInputCount: 1 };
+  const need = wfMeta.imageInputCount || 1;
+  hideContextMenu();
+
+  // Collect selected image paths (multi-select support)
+  const selectedImages = [];
+  if (state.selected.size > 0) {
+    for (const p of state.selected) {
+      const ext = p.split('.').pop()?.toLowerCase();
+      if (['jpg','jpeg','png','gif','webp','bmp'].includes(ext)) {
+        selectedImages.push(p);
+      }
+    }
+  }
+  const rightClickPath = getFilePath(contextTarget);
+  if (!selectedImages.includes(rightClickPath)) selectedImages.unshift(rightClickPath);
+
+  if (need === 1) {
+    // Single-image workflow: one task per selected image (batch)
+    const images = selectedImages.length ? selectedImages : [rightClickPath];
+    try {
+      const r = await apiPostJson('/api/ai/tasks/batch', {
+        workflowId: wfId,
+        imageRefs: images.map(path => ({ rootId: 'main', path })),
+      });
+      showToast(`已提交 ${r.count} 个AI任务`, 'success');
+    } catch (err) {
+      showToast('提交失败: ' + err.message, 'error');
+    }
+    return;
+  }
+
+  // Multi-image workflow: open guided dialog to assign one image per slot
+  openAiMultiDialog(wfId, wfMeta, selectedImages);
+});
+
 function hideContextMenu() {
   dom.contextMenu.classList.add('hidden');
+  hideAiSubmenu();
   contextTarget = null;
   document.querySelectorAll('.file-card.context-target').forEach(el => el.classList.remove('context-target'));
+}
+
+// ---------- Multi-image workflow dialog ----------
+let _aiMultiState = null; // { wfId, slots: [path|null], imageInputs, candidates }
+
+function openAiMultiDialog(wfId, wfMeta, preselected) {
+  _aiMultiState = {
+    wfId,
+    imageInputs: wfMeta.imageInputs || [],
+    slots: (wfMeta.imageInputs || []).map((_, i) => preselected[i] || null),
+    candidates: preselected.slice(),
+  };
+  dom.aiMultiTitle.textContent = `AI 工作流「${wfMeta.name}」— 按顺序选择 ${wfMeta.imageInputs.length} 张图片`;
+  dom.aiMultiHint.innerHTML = `该工作流需要 <b>${wfMeta.imageInputs.length}</b> 张图片作为输入，按下方顺序逐一指定。` +
+    ` 已选 <b>${preselected.length}</b> 张候选图，可从下拉框选择或留空后用「选择文件」按钮浏览。`;
+  renderAiMultiSlots();
+  dom.aiMultiError.textContent = '';
+  dom.aiMultiOverlay.classList.remove('hidden');
+}
+
+function renderAiMultiSlots() {
+  const st = _aiMultiState;
+  if (!st) return;
+  let h = '';
+  st.imageInputs.forEach((inp, i) => {
+    const cur = st.slots[i] || '';
+    const opts = ['<option value="">— 未选择 —</option>']
+      .concat(st.candidates.map(p => `<option value="${escapeHtml(p)}"${p===cur?' selected':''}>${escapeHtml(p.split('/').pop())}</option>`))
+      .join('');
+    h += `<div class="settings-field" style="margin:0">
+      <label>第 ${i + 1} 张图片${inp.label ? '（'+escapeHtml(inp.label)+'）' : ''}</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="settings-input" data-slot="${i}" style="flex:1;font-family:var(--mono);">${opts}</select>
+        <button class="btn-secondary" data-pick="${i}" style="padding:6px 10px;white-space:nowrap">选择文件</button>
+        <button class="btn-secondary" data-clear="${i}" style="padding:6px 10px;white-space:nowrap">清空</button>
+      </div>
+      <div class="settings-hint" data-preview="${i}" style="font-family:var(--mono);word-break:break-all">${cur ? escapeHtml(cur) : ''}</div>
+    </div>`;
+  });
+  dom.aiMultiSlots.innerHTML = h;
+  $$('[data-slot]', dom.aiMultiSlots).forEach(sel => {
+    sel.addEventListener('change', () => {
+      const i = +sel.dataset.slot;
+      _aiMultiState.slots[i] = sel.value || null;
+      const pv = dom.aiMultiSlots.querySelector(`[data-preview="${i}"]`);
+      if (pv) pv.textContent = sel.value || '';
+    });
+  });
+  $$('[data-pick]', dom.aiMultiSlots).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = +btn.dataset.pick;
+      openFilePickerForAi((path) => {
+        _aiMultiState.slots[i] = path;
+        const sel = dom.aiMultiSlots.querySelector(`[data-slot="${i}"]`);
+        if (sel && ![...sel.options].some(o => o.value === path)) {
+          const o = document.createElement('option');
+          o.value = path; o.textContent = path.split('/').pop();
+          sel.appendChild(o);
+        }
+        sel.value = path;
+        const pv = dom.aiMultiSlots.querySelector(`[data-preview="${i}"]`);
+        if (pv) pv.textContent = path;
+      });
+    });
+  });
+  $$('[data-clear]', dom.aiMultiSlots).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = +btn.dataset.clear;
+      _aiMultiState.slots[i] = null;
+      const sel = dom.aiMultiSlots.querySelector(`[data-slot="${i}"]`);
+      if (sel) sel.value = '';
+      const pv = dom.aiMultiSlots.querySelector(`[data-preview="${i}"]`);
+      if (pv) pv.textContent = '';
+    });
+  });
+}
+
+function closeAiMultiDialog() {
+  dom.aiMultiOverlay.classList.add('hidden');
+  _aiMultiState = null;
+}
+
+// Minimal file picker: reuses the browse API to walk the file manager
+function openFilePickerForAi(callback) {
+  // Build a lightweight modal on the fly
+  let cwd = state.currentPath || '';
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  overlay.style.display = 'flex';
+  overlay.style.zIndex = '4000';
+  overlay.innerHTML = `
+    <div class="dialog-modal" style="width:520px">
+      <div class="dialog-header"><h3>选择图片</h3><button class="btn-icon" title="关闭">&times;</button></div>
+      <div class="dialog-body" style="display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow:hidden">
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn-secondary" data-up style="padding:5px 10px">上级</button>
+          <span class="settings-hint" data-path style="flex:1;font-family:var(--mono);word-break:break-all"></span>
+        </div>
+        <div data-grid style="flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" data-cancel>取消</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const grid = overlay.querySelector('[data-grid]');
+  const pathEl = overlay.querySelector('[data-path]');
+  const close = () => overlay.remove();
+  overlay.querySelector('.btn-icon').addEventListener('click', close);
+  overlay.querySelector('[data-cancel]').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('[data-up]').addEventListener('click', () => {
+    cwd = cwd.split('/').slice(0, -1).join('/');
+    renderPick();
+  });
+  async function renderPick() {
+    pathEl.textContent = '/' + cwd;
+    grid.innerHTML = '<div class="settings-hint">加载中...</div>';
+    try {
+      const data = await apiBrowse(cwd);
+      const items = data.entries || [];
+      grid.innerHTML = '';
+      items.forEach(it => {
+        const isImg = it.type === 'file' && ['jpg','jpeg','png','gif','webp','bmp'].includes((it.name.split('.').pop()||'').toLowerCase());
+        if (it.type === 'directory') {
+          const d = document.createElement('div');
+          d.style.cssText = 'cursor:pointer;padding:8px;border:1px solid var(--border);border-radius:6px;text-align:center';
+          d.innerHTML = `📁<br><span style="font-size:12px;word-break:break-all">${escapeHtml(it.name)}</span>`;
+          d.addEventListener('click', () => { cwd = cwd ? cwd + '/' + it.name : it.name; renderPick(); });
+          grid.appendChild(d);
+        } else if (isImg) {
+          const p = cwd ? cwd + '/' + it.name : it.name;
+          const url = `/api/file?path=${encodeURIComponent(p)}`;
+          const d = document.createElement('div');
+          d.style.cssText = 'cursor:pointer;padding:4px;border:1px solid var(--border);border-radius:6px;text-align:center';
+          d.innerHTML = `<img src="${url}" style="width:100%;height:70px;object-fit:cover;border-radius:4px"><br><span style="font-size:11px;word-break:break-all">${escapeHtml(it.name)}</span>`;
+          d.addEventListener('click', () => { callback(p); close(); });
+          grid.appendChild(d);
+        }
+      });
+      if (!grid.children.length) grid.innerHTML = '<div class="settings-hint">无图片文件</div>';
+    } catch (err) {
+      grid.innerHTML = `<div class="settings-hint" style="color:var(--danger)">${escapeHtml(err.message)}</div>`;
+    }
+  }
+  renderPick();
+}
+
+dom.aiMultiClose.addEventListener('click', closeAiMultiDialog);
+dom.aiMultiCancel.addEventListener('click', closeAiMultiDialog);
+dom.aiMultiOverlay.addEventListener('click', e => { if (e.target === dom.aiMultiOverlay) closeAiMultiDialog(); });
+dom.aiMultiConfirm.addEventListener('click', async () => {
+  const st = _aiMultiState;
+  if (!st) return;
+  const filled = st.slots.map(s => s || '').filter(Boolean);
+  if (filled.length !== st.imageInputs.length) {
+    dom.aiMultiError.textContent = `还需选择 ${st.imageInputs.length - filled.length} 张图片`;
+    return;
+  }
+  dom.aiMultiConfirm.disabled = true;
+  try {
+    const r = await apiPostJson('/api/ai/tasks/with-images', {
+      workflowId: st.wfId,
+      imageRefs: filled.map(path => ({ rootId: 'main', path })),
+    });
+    showToast(`已提交 AI 任务`, 'success');
+    closeAiMultiDialog();
+  } catch (err) {
+    dom.aiMultiError.textContent = err.message;
+  } finally {
+    dom.aiMultiConfirm.disabled = false;
+  }
+});
+
+// =================== Image Editor ===================
+let _ie = null; // { sourcePath, baseName, dir, img, rotation, flipH, flipV, crop, dirty }
+
+function openImageEditor(entry) {
+  const path = getFilePath(entry);
+  _ie = {
+    sourcePath: path,
+    dir: path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '',
+    baseName: entry.name,
+    img: new Image(),
+    rotation: 0, flipH: false, flipV: false, crop: null, dirty: false,
+  };
+  dom.imgEditTitle.textContent = '编辑图片 — ' + entry.name;
+  dom.ieError.textContent = '';
+  dom.ieCropApply.style.display = 'none';
+  dom.ieCropCancel.style.display = 'none';
+  dom.ieCrop.style.display = '';
+  dom.imgEditOverlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  // load image via fetch to avoid caching issues with same-origin
+  _ie.img.onload = () => { renderIeCanvas(); updateIeInfo(); };
+  _ie.img.onerror = () => { dom.ieError.textContent = '图片加载失败'; };
+  _ie.img.crossOrigin = 'anonymous';
+  _ie.img.src = getFileUrl(entry) + '&t=' + Date.now();
+}
+
+function renderIeCanvas() {
+  const canvas = dom.ieCanvas;
+  const ctx = canvas.getContext('2d');
+  const img = _ie.img;
+  const rot = _ie.rotation % 360;
+  const swap = rot === 90 || rot === 270;
+  const w = swap ? img.naturalHeight : img.naturalWidth;
+  const h = swap ? img.naturalWidth : img.naturalHeight;
+  canvas.width = w; canvas.height = h;
+  ctx.save();
+  ctx.clearRect(0, 0, w, h);
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.scale(_ie.flipH ? -1 : 1, _ie.flipV ? -1 : 1);
+  ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  ctx.restore();
+  // draw crop overlay if active
+  if (_ie.crop) drawIeCropOverlay();
+}
+
+function updateIeInfo() {
+  const canvas = dom.ieCanvas;
+  dom.ieInfo.textContent = `${canvas.width} × ${canvas.height}px`;
+}
+
+function ieApplyTransformsThen(callback) {
+  // Bake current rotation/flips into a new image so crop works on the displayed pixels
+  const canvas = dom.ieCanvas;
+  const off = document.createElement('canvas');
+  off.width = canvas.width; off.height = canvas.height;
+  off.getContext('2d').drawImage(canvas, 0, 0);
+  const tmp = new Image();
+  tmp.onload = () => callback(tmp);
+  tmp.src = off.toDataURL();
+}
+
+function ieRotate(dir) {
+  _ie.rotation = (_ie.rotation + (dir > 0 ? 90 : 270)) % 360;
+  _ie.dirty = true;
+  renderIeCanvas(); updateIeInfo();
+}
+
+function ieFlip(axis) {
+  if (axis === 'h') _ie.flipH = !_ie.flipH;
+  else _ie.flipV = !_ie.flipV;
+  _ie.dirty = true;
+  renderIeCanvas(); updateIeInfo();
+}
+
+function ieReset() {
+  _ie.rotation = 0; _ie.flipH = false; _ie.flipV = false; _ie.crop = null;
+  _ie.dirty = false;
+  dom.ieCropApply.style.display = 'none';
+  dom.ieCropCancel.style.display = 'none';
+  dom.ieCrop.style.display = '';
+  renderIeCanvas(); updateIeInfo();
+}
+
+// ---- Crop via drag selection on canvas ----
+let _ieCropDrag = null;
+function enterCropMode() {
+  _ie.crop = { x: 0, y: 0, w: 0, h: 0 };
+  dom.ieCropApply.style.display = '';
+  dom.ieCropCancel.style.display = '';
+  dom.ieCrop.style.display = 'none';
+  renderIeCanvas();
+}
+function exitCropMode(apply) {
+  if (!apply || !_ie.crop || _ie.crop.w < 2 || _ie.crop.h < 2) {
+    _ie.crop = null;
+    dom.ieCropApply.style.display = 'none';
+    dom.ieCropCancel.style.display = 'none';
+    dom.ieCrop.style.display = '';
+    renderIeCanvas();
+    return;
+  }
+  // apply crop: bake transforms first so coordinates match displayed canvas
+  ieApplyTransformsThen((baked) => {
+    const c = Math.max(0, Math.round(_ie.crop.x));
+    const d = Math.max(0, Math.round(_ie.crop.y));
+    const cw = Math.min(dom.ieCanvas.width - c, Math.round(_ie.crop.w));
+    const ch = Math.min(dom.ieCanvas.height - d, Math.round(_ie.crop.h));
+    const off = document.createElement('canvas');
+    off.width = cw; off.height = ch;
+    off.getContext('2d').drawImage(baked, c, d, cw, ch, 0, 0, cw, ch);
+    const tmp = new Image();
+    tmp.onload = () => {
+      _ie.img = tmp;
+      _ie.rotation = 0; _ie.flipH = false; _ie.flipV = false;
+      _ie.crop = null; _ie.dirty = true;
+      dom.ieCropApply.style.display = 'none';
+      dom.ieCropCancel.style.display = 'none';
+      dom.ieCrop.style.display = '';
+      renderIeCanvas(); updateIeInfo();
+    };
+    tmp.src = off.toDataURL();
+  });
+}
+
+function drawIeCropOverlay() {
+  const canvas = dom.ieCanvas;
+  const ctx = canvas.getContext('2d');
+  const cr = _ie.crop;
+  // dim outside
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, 0, canvas.width, cr.y);
+  ctx.fillRect(0, cr.y, cr.x, cr.h);
+  ctx.fillRect(cr.x + cr.w, cr.y, canvas.width - cr.x - cr.w, cr.h);
+  ctx.fillRect(0, cr.y + cr.h, canvas.width, canvas.height - cr.y - cr.h);
+  ctx.strokeStyle = '#89b4fa';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cr.x + 0.5, cr.y + 0.5, cr.w, cr.h);
+  ctx.restore();
+}
+
+function ieCanvasPos(e) {
+  const rect = dom.ieCanvas.getBoundingClientRect();
+  // canvas may be displayed scaled; map to canvas pixels
+  const sx = dom.ieCanvas.width / rect.width;
+  const sy = dom.ieCanvas.height / rect.height;
+  return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+}
+
+dom.ieCanvas.addEventListener('mousedown', (e) => {
+  if (!_ie || !_ie.crop) return;
+  const p = ieCanvasPos(e);
+  _ieCropDrag = { startX: p.x, startY: p.y };
+  _ie.crop.x = p.x; _ie.crop.y = p.y; _ie.crop.w = 0; _ie.crop.h = 0;
+});
+document.addEventListener('mousemove', (e) => {
+  if (!_ieCropDrag || !_ie || !_ie.crop) return;
+  const p = ieCanvasPos(e);
+  const x = Math.min(_ieCropDrag.startX, p.x);
+  const y = Math.min(_ieCropDrag.startY, p.y);
+  _ie.crop.x = Math.max(0, x);
+  _ie.crop.y = Math.max(0, y);
+  _ie.crop.w = Math.min(dom.ieCanvas.width - _ie.crop.x, Math.abs(p.x - _ieCropDrag.startX));
+  _ie.crop.h = Math.min(dom.ieCanvas.height - _ie.crop.y, Math.abs(p.y - _ieCropDrag.startY));
+  renderIeCanvas();
+});
+document.addEventListener('mouseup', () => { _ieCropDrag = null; });
+
+function ieExportBlob() {
+  // Re-render from source image WITHOUT the crop overlay so exports are always clean
+  const img = _ie.img;
+  const rot = _ie.rotation % 360;
+  const swap = rot === 90 || rot === 270;
+  const w = swap ? img.naturalHeight : img.naturalWidth;
+  const h = swap ? img.naturalWidth : img.naturalHeight;
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const ctx = off.getContext('2d');
+  // For formats without alpha, paint a white background to avoid black
+  const fmt = dom.ieFormat.value;
+  if (fmt === 'image/jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); }
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.scale(_ie.flipH ? -1 : 1, _ie.flipV ? -1 : 1);
+  ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  ctx.restore();
+  const q = parseFloat(dom.ieQuality.value) || 0.92;
+  return new Promise((resolve, reject) => {
+    off.toBlob((blob) => blob ? resolve(blob) : reject(new Error('导出失败')), fmt, q);
+  });
+}
+
+async function ieSave(as) {
+  if (!_ie) return;
+  dom.ieError.textContent = '';
+  try {
+    const blob = await ieExportBlob();
+    let targetName;
+    if (as) {
+      targetName = prompt('另存为（输入文件名）', _ie.baseName.replace(/(\.[^.]+)?$/, '_edit$1'));
+      if (!targetName) return;
+    } else {
+      targetName = _ie.baseName;
+    }
+    // adjust extension to match format
+    const fmt = dom.ieFormat.value;
+    const extByFmt = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[fmt];
+    if (!new RegExp('\\.' + extByFmt + '$', 'i').test(targetName)) {
+      targetName = targetName.replace(/\.[^.]+$/, '') + '.' + extByFmt;
+    }
+    const file = new File([blob], targetName, { type: fmt });
+    const formData = new FormData();
+    formData.append('uploadDir', _ie.dir);
+    formData.append('files', file);
+    const result = await apiUpload(formData);
+    const ok = result.results.filter(r => r.success).length;
+    if (ok) {
+      showToast(as ? `已另存为 ${targetName}` : `已保存 ${targetName}`, 'success');
+      if (!as) _ie.dirty = false;
+      closeImageEditor();
+      refreshCurrent();
+    } else {
+      dom.ieError.textContent = (result.results[0] && result.results[0].error) || '保存失败';
+    }
+  } catch (err) {
+    dom.ieError.textContent = err.message;
+  }
+}
+
+function closeImageEditor() {
+  if (_ie && _ie.dirty && !confirm('有未保存的改动，确定关闭？')) return;
+  dom.imgEditOverlay.classList.add('hidden');
+  document.body.style.overflow = '';
+  _ie = null;
+}
+
+dom.previewImageEdit.addEventListener('click', () => {
+  if (state.previewFile && getFileCategory(state.previewFile) === 'image') {
+    openImageEditor(state.previewFile);
+  }
+});
+dom.imgEditClose.addEventListener('click', closeImageEditor);
+dom.imgEditOverlay.addEventListener('click', e => { if (e.target === dom.imgEditOverlay) closeImageEditor(); });
+dom.ieRotateL.addEventListener('click', () => ieRotate(-1));
+dom.ieRotateR.addEventListener('click', () => ieRotate(1));
+dom.ieFlipH.addEventListener('click', () => ieFlip('h'));
+dom.ieFlipV.addEventListener('click', () => ieFlip('v'));
+dom.ieReset.addEventListener('click', ieReset);
+dom.ieCrop.addEventListener('click', enterCropMode);
+dom.ieCropApply.addEventListener('click', () => exitCropMode(true));
+dom.ieCropCancel.addEventListener('click', () => exitCropMode(false));
+dom.ieSave.addEventListener('click', () => ieSave(false));
+dom.ieSaveAs.addEventListener('click', () => ieSave(true));
+
+// =================== Batch Image Processing (P0) ===================
+let _bi = null; // { paths:[], imgs:[{path,name,el,ext}], selIdx, cancel:false, targetDir:'' }
+
+const BI_IMG_EXTS = ['jpg','jpeg','png','gif','webp','bmp'];
+const BI_FMT_EXT = { 'image/jpeg':'jpg', 'image/webp':'webp', 'image/png':'png' };
+const BI_KEEP_EXT = { 'image/jpeg':['jpg','jpeg'], 'image/webp':['webp'], 'image/png':['png'], 'image/gif':['gif'] };
+
+function _biLoadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('_bi_settings') || '{}');
+    if (s.width != null) dom.biWidth.value = s.width;
+    if (s.height != null) dom.biHeight.value = s.height;
+    if (s.widthAuto) dom.biWidthAuto.checked = true;
+    if (s.heightAuto) dom.biHeightAuto.checked = true;
+    if (s.crop) dom.biCrop.value = s.crop;
+    if (s.format) dom.biFormat.value = s.format;
+    if (s.quality != null) { dom.biQuality.value = s.quality; dom.biQualityVal.textContent = s.quality; }
+    if (s.rename) dom.biRename.value = s.rename;
+    if (s.renameStart != null) dom.biRenameStart.value = s.renameStart;
+    if (s.padColor) dom.biPadColor.value = s.padColor;
+    if (s.output) dom.biOutput.value = s.output;
+    if (s.focal) dom.biFocal.value = s.focal;
+    if (s.unit) dom.biUnit.value = s.unit;
+    if (s.hq) dom.biHq.checked = true;
+    if (s.borderColor) dom.biBorderColor.value = s.borderColor;
+    if (s.borderW != null) dom.biBorderW.value = s.borderW;
+    if (s.borderRadius != null) dom.biBorderRadius.value = s.borderRadius;
+    if (s.borderEnable) dom.biBorderEnable.checked = true;
+    if (s.keepExif) dom.biKeepExif.checked = true;
+    if (s.prep && _bi) _bi.prep = s.prep;
+    if (s.wmLayers && _bi) _bi.wmLayers = _biDeserializeWmLayers(s.wmLayers);
+  } catch (_) {}
+}
+function _biSaveSettings() {
+  const s = _biReadSettings();
+  s.wmLayers = _biSerializeWmLayers();
+  localStorage.setItem('_bi_settings', JSON.stringify(s));
+}
+
+// watermark layers: serialize image layers without the DOM imgEl (keep src)
+function _biSerializeWmLayers() {
+  if (!_bi) return [];
+  return _bi.wmLayers.map(l => {
+    const o = { ...l };
+    if (l.type === 'image' && l.imgEl) { o.imgSrc = l.imgEl.src; delete o.imgEl; }
+    return o;
+  });
+}
+function _biDeserializeWmLayers(arr) {
+  return (arr || []).map(l => {
+    const o = { ...l };
+    if (o.type === 'image' && o.imgSrc) {
+      const img = new Image();
+      img.onload = () => _biRenderPreview();
+      img.src = o.imgSrc;
+      o.imgEl = img;
+    }
+    delete o.imgSrc;
+    return o;
+  });
+}
+
+let _biWmId = 1;
+function _biWmNewText() { return { id: _biWmId++, type: 'text', enabled: true, text: '水印', size: 32, color: '#ffffff', opacity: 0.7, pos: 'br' }; }
+function _biWmNewImage() { return { id: _biWmId++, type: 'image', enabled: true, imgEl: null, imgScale: 0.2, opacity: 0.8, pos: 'br', tile: false }; }
+
+function _biRenderWmLayers() {
+  if (!_bi) return;
+  let h = '';
+  _bi.wmLayers.forEach((l, idx) => {
+    const en = l.enabled ? 'checked' : '';
+    if (l.type === 'text') {
+      h += `<div class="bi-wm-row" data-id="${l.id}" style="border:1px solid var(--border);border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="checkbox" data-f="enabled" ${en}>
+          <span style="font-size:11px;color:var(--muted)">文字</span>
+          <span style="flex:1"></span>
+          <button type="button" class="btn-secondary" data-act="up" style="padding:2px 6px;font-size:11px">↑</button>
+          <button type="button" class="btn-secondary" data-act="down" style="padding:2px 6px;font-size:11px">↓</button>
+          <button type="button" class="btn-secondary" data-act="del" style="padding:2px 6px;font-size:11px">✕</button>
+        </div>
+        <input type="text" data-f="text" value="${escapeHtml(l.text||'')}" class="settings-input" placeholder="水印文字" style="font-family:inherit">
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <input type="number" data-f="size" value="${l.size}" min="8" style="width:54px;font-family:var(--mono)" title="字号">
+          <input type="color" data-f="color" value="${l.color}" style="width:30px;height:28px">
+          <input type="range" data-f="opacity" min="0.1" max="1" step="0.05" value="${l.opacity}" style="width:70px" title="不透明度">
+          <select data-f="pos" class="settings-input" style="width:auto;font-family:inherit;font-size:11px">
+            ${['br','bl','tr','tl','c'].map(p=>`<option value="${p}" ${l.pos===p?'selected':''}>${({br:'右下',bl:'左下',tr:'右上',tl:'左上',c:'居中'})[p]}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+    } else {
+      h += `<div class="bi-wm-row" data-id="${l.id}" style="border:1px solid var(--border);border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="checkbox" data-f="enabled" ${en}>
+          <span style="font-size:11px;color:var(--muted)">图片</span>
+          <span style="flex:1;font-size:11px;color:var(--muted)">${l.imgEl?'已加载':'未加载'}</span>
+          <button type="button" class="btn-secondary" data-act="up" style="padding:2px 6px;font-size:11px">↑</button>
+          <button type="button" class="btn-secondary" data-act="down" style="padding:2px 6px;font-size:11px">↓</button>
+          <button type="button" class="btn-secondary" data-act="del" style="padding:2px 6px;font-size:11px">✕</button>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <input type="number" data-f="imgScale" value="${l.imgScale}" min="0.01" step="0.05" style="width:60px;font-family:var(--mono)" title="缩放比例(相对短边)">
+          <input type="range" data-f="opacity" min="0.1" max="1" step="0.05" value="${l.opacity}" style="width:70px" title="不透明度">
+          <label style="display:flex;align-items:center;gap:3px;font-size:11px"><input type="checkbox" data-f="tile" ${l.tile?'checked':''}> 平铺</label>
+          <select data-f="pos" class="settings-input" style="width:auto;font-family:inherit;font-size:11px">
+            ${['br','bl','tr','tl','c'].map(p=>`<option value="${p}" ${l.pos===p?'selected':''}>${({br:'右下',bl:'左下',tr:'右上',tl:'左上',c:'居中'})[p]}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+    }
+  });
+  dom.biWmLayers.innerHTML = h || '<div class="settings-hint">无水印图层</div>';
+  // wire inputs
+  $$('.bi-wm-row', dom.biWmLayers).forEach(row => {
+    const id = +row.dataset.id;
+    const layer = _bi.wmLayers.find(l => l.id === id);
+    if (!layer) return;
+    $$('[data-f]', row).forEach(inp => {
+      const f = inp.dataset.f;
+      const handler = () => {
+        if (inp.type === 'checkbox') layer[f] = inp.checked;
+        else if (inp.type === 'number' || inp.type === 'range') layer[f] = parseFloat(inp.value);
+        else layer[f] = inp.value;
+        _biRenderPreview(); _biSaveSettings();
+      };
+      inp.addEventListener('input', handler);
+      inp.addEventListener('change', handler);
+    });
+    $$('[data-act]', row).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        const i = _bi.wmLayers.findIndex(l => l.id === id);
+        if (act === 'del') _bi.wmLayers.splice(i, 1);
+        else if (act === 'up' && i > 0) { const a = _bi.wmLayers[i-1]; _bi.wmLayers[i-1]=_bi.wmLayers[i]; _bi.wmLayers[i]=a; }
+        else if (act === 'down' && i < _bi.wmLayers.length-1) { const a = _bi.wmLayers[i+1]; _bi.wmLayers[i+1]=_bi.wmLayers[i]; _bi.wmLayers[i]=a; }
+        _biRenderWmLayers(); _biRenderPreview(); _biSaveSettings();
+      });
+    });
+  });
+}
+
+function _biUpdateUnitLabels() {
+  const u = dom.biUnit.value === 'pct' ? '%' : 'px';
+  dom.biWidthLabel.textContent = `宽度 (${u})`;
+  dom.biHeightLabel.textContent = `高度 (${u})`;
+}
+
+function _biUpdatePrepInfo() {
+  if (!_bi) return;
+  const p = _bi.prep;
+  const parts = [];
+  if (p.rotation) parts.push(`旋转${p.rotation}°`);
+  if (p.flipH) parts.push('水平翻转');
+  if (p.flipV) parts.push('垂直翻转');
+  dom.biPrepInfo.textContent = parts.length ? parts.join('，') : '无';
+}
+
+// --- presets (localStorage) ---
+function _biPresets() { try { return JSON.parse(localStorage.getItem('_bi_presets') || '{}'); } catch (_) { return {}; } }
+function _biRefreshPresets() {
+  const ps = _biPresets();
+  let h = '<option value="">— 选择预设 —</option>';
+  Object.keys(ps).forEach(n => { h += `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`; });
+  dom.biPreset.innerHTML = h;
+}
+function _biApplyPreset(name) {
+  const ps = _biPresets();
+  const s = ps[name]; if (!s) return;
+  if (s.width != null) dom.biWidth.value = s.width;
+  if (s.height != null) dom.biHeight.value = s.height;
+  dom.biWidthAuto.checked = !!s.widthAuto; dom.biHeightAuto.checked = !!s.heightAuto;
+  if (s.crop) dom.biCrop.value = s.crop;
+  if (s.format) dom.biFormat.value = s.format;
+  if (s.quality != null) { dom.biQuality.value = s.quality; dom.biQualityVal.textContent = s.quality; }
+  if (s.rename) dom.biRename.value = s.rename;
+  if (s.renameStart != null) dom.biRenameStart.value = s.renameStart;
+  if (s.padColor) dom.biPadColor.value = s.padColor;
+  if (s.focal) dom.biFocal.value = s.focal;
+  if (s.unit) dom.biUnit.value = s.unit;
+  dom.biHq.checked = !!s.hq;
+  if (s.borderColor) dom.biBorderColor.value = s.borderColor;
+  if (s.borderW != null) dom.biBorderW.value = s.borderW;
+  if (s.borderRadius != null) dom.biBorderRadius.value = s.borderRadius;
+  dom.biBorderEnable.checked = !!s.borderEnable;
+  dom.biKeepExif.checked = !!s.keepExif;
+  if (s.prep && _bi) { _bi.prep = s.prep; _biUpdatePrepInfo(); }
+  if (s.wmLayers && _bi) { _bi.wmLayers = _biDeserializeWmLayers(s.wmLayers); _biRenderWmLayers(); }
+  _biUpdateUnitLabels(); _biTogglePadField(); _biToggleTargetRow();
+  _biRenderPreview(); _biUpdateNamePreview();
+}
+
+// --- preset import/export ---
+function _biExportPresets() {
+  const ps = _biPresets();
+  const blob = new Blob([JSON.stringify(ps, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `birme-presets-${Date.now()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showToast('已导出预设', 'success');
+}
+function _biImportPresets(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imp = JSON.parse(reader.result);
+      const ps = _biPresets();
+      let n = 0;
+      for (const k in imp) { ps[k] = imp[k]; n++; }
+      localStorage.setItem('_bi_presets', JSON.stringify(ps));
+      _biRefreshPresets();
+      showToast(`已导入 ${n} 个预设`, 'success');
+    } catch (e) { showToast('导入失败: ' + e.message, 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+// --- batch history (localStorage) ---
+function _biHistory() { try { return JSON.parse(localStorage.getItem('_bi_history') || '[]'); } catch (_) { return []; } }
+function _biRecordHistory(entry) {
+  const h = _biHistory();
+  h.unshift(entry);
+  if (h.length > 50) h.length = 50;
+  localStorage.setItem('_bi_history', JSON.stringify(h));
+}
+function _biRenderHistory() {
+  const h = _biHistory();
+  if (!h.length) { dom.biHistoryList.innerHTML = '<div class="settings-hint">暂无历史记录</div>'; return; }
+  let html = '';
+  h.forEach((e, i) => {
+    const t = new Date(e.time).toLocaleString();
+    const summary = `${e.count}张 · ${e.outputMode === 'zip' ? 'ZIP' : '目录'} · 成功${e.ok} 失败${e.fail}`;
+    const dims = e.settings ? `${e.settings.width||'自动'}×${e.settings.height||'自动'}${e.settings.unit==='pct'?'%':'px'}` : '';
+    html += `<div class="bi-hist-row" data-i="${i}" style="border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;gap:8px;align-items:center">
+      <div style="flex:1"><div style="font-size:12px">${escapeHtml(t)}</div><div class="settings-hint">${escapeHtml(summary)}${dims?' · '+escapeHtml(dims):''}</div></div>
+      <button class="btn-secondary" data-load="${i}" style="padding:4px 10px;font-size:12px">载入</button>
+      <button class="btn-secondary" data-del="${i}" style="padding:4px 10px;font-size:12px">删</button>
+    </div>`;
+  });
+  dom.biHistoryList.innerHTML = html;
+  $$('[data-load]', dom.biHistoryList).forEach(b => b.addEventListener('click', () => {
+    const e = _biHistory()[+b.dataset.load]; if (!e) return;
+    _biApplyHistoryEntry(e);
+    dom.biHistoryOverlay.classList.add('hidden');
+  }));
+  $$('[data-del]', dom.biHistoryList).forEach(b => b.addEventListener('click', () => {
+    const h = _biHistory(); h.splice(+b.dataset.del, 1);
+    localStorage.setItem('_bi_history', JSON.stringify(h));
+    _biRenderHistory();
+  }));
+}
+function _biApplyHistoryEntry(e) {
+  if (!_bi || !e.settings) return;
+  const s = e.settings;
+  if (s.width != null) dom.biWidth.value = s.width;
+  if (s.height != null) dom.biHeight.value = s.height;
+  dom.biWidthAuto.checked = !!s.widthAuto; dom.biHeightAuto.checked = !!s.heightAuto;
+  if (s.crop) dom.biCrop.value = s.crop;
+  if (s.format) dom.biFormat.value = s.format;
+  if (s.quality != null) { dom.biQuality.value = s.quality; dom.biQualityVal.textContent = s.quality; }
+  if (s.rename) dom.biRename.value = s.rename;
+  if (s.renameStart != null) dom.biRenameStart.value = s.renameStart;
+  if (s.padColor) dom.biPadColor.value = s.padColor;
+  if (s.focal) dom.biFocal.value = s.focal;
+  if (s.unit) dom.biUnit.value = s.unit;
+  dom.biHq.checked = !!s.hq;
+  if (s.borderColor) dom.biBorderColor.value = s.borderColor;
+  if (s.borderW != null) dom.biBorderW.value = s.borderW;
+  if (s.borderRadius != null) dom.biBorderRadius.value = s.borderRadius;
+  dom.biBorderEnable.checked = !!s.borderEnable;
+  dom.biKeepExif.checked = !!s.keepExif;
+  if (s.prep) { _bi.prep = s.prep; _biUpdatePrepInfo(); }
+  if (s.wmLayers) { _bi.wmLayers = _biDeserializeWmLayers(s.wmLayers); _biRenderWmLayers(); }
+  _biUpdateUnitLabels(); _biTogglePadField(); _biToggleTargetRow();
+  _biRenderPreview(); _biUpdateNamePreview();
+  showToast('已载入历史设置', 'success');
+}
+
+// --- shared presets (team) + admin default ---
+async function _biRefreshSharedPresets() {
+  try {
+    const data = await apiGetJson('/api/ai/presets');
+    let h = '<option value="">— 团队预设 —</option>';
+    (data.presets || []).forEach(p => { h += `<option value="${escapeHtml(p.name)}"${p.isDefault?' selected':''}>${escapeHtml(p.name)}${p.isDefault?' (默认)':''}</option>`; });
+    dom.biSharedPreset.innerHTML = h;
+  } catch (_) { dom.biSharedPreset.innerHTML = '<option value="">— 团队预设 —</option>'; }
+}
+async function _biLoadSharedPreset() {
+  const name = dom.biSharedPreset.value; if (!name) return;
+  try {
+    const p = await apiGetJson('/api/ai/presets/' + encodeURIComponent(name));
+    if (p && p.settings) _biApplyHistoryEntry({ settings: p.settings });
+  } catch (e) { showToast('载入失败: ' + e.message, 'error'); }
+}
+async function _biPublishSharedPreset() {
+  const name = prompt('发布为共享预设（名称）'); if (!name) return;
+  const settings = _biReadSettings();
+  settings.wmLayers = _biSerializeWmLayers();
+  settings.prep = _bi ? _bi.prep : null;
+  try {
+    await apiPostJson('/api/ai/presets', { name, settings });
+    showToast(`已发布共享预设「${name}」`, 'success');
+    _biRefreshSharedPresets();
+  } catch (e) { showToast('发布失败: ' + e.message, 'error'); }
+}
+async function _biSetSharedDefault() {
+  const name = dom.biSharedPreset.value; if (!name) return;
+  try {
+    await apiPostJson('/api/ai/presets/default', { name });
+    showToast(`已将「${name}」设为默认预设`, 'success');
+    _biRefreshSharedPresets();
+  } catch (e) { showToast('设置失败: ' + e.message, 'error'); }
+}
+async function _biMaybeApplyDefault() {
+  // Apply admin default preset on first open (when user has no saved local settings)
+  if (localStorage.getItem('_bi_settings')) return; // user already has preferences
+  try {
+    const cfg = await apiGetJson('/api/ai/config');
+    const dp = cfg && cfg.defaultPreset;
+    if (dp) {
+      const p = await apiGetJson('/api/ai/presets/' + encodeURIComponent(dp));
+      if (p && p.settings) _biApplyHistoryEntry({ settings: p.settings });
+    }
+  } catch (_) {}
+}
+
+function openBatchImages(paths) {
+  // de-dupe, filter image types, enforce 50MB limit
+  const seen = new Set();
+  const items = [];
+  for (const p of paths) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    const ext = (p.split('.').pop() || '').toLowerCase();
+    if (!BI_IMG_EXTS.includes(ext)) continue;
+    items.push({ path: p, name: p.split('/').pop(), ext, el: null, loaded: false, tooBig: false });
+  }
+  if (!items.length) { showToast('未选择有效的图片文件', 'error'); return; }
+  _bi = { items, selIdx: 0, cancel: false, targetDir: '', existingNames: null, prep: { rotation: 0, flipH: false, flipV: false }, wmLayers: [], lastResults: null };
+  dom.batchImgTitle.textContent = `批量图片处理 — ${items.length} 张图片`;
+  _biLoadSettings();
+  _biRefreshPresets();
+  _biRefreshSharedPresets();
+  _biRenderList();
+  _biRenderWmLayers();
+  _biUpdatePrepInfo();
+  _biUpdateNamePreview();
+  _biUpdateUnitLabels();
+  _biMaybeApplyDefault();
+  dom.biError.textContent = '';
+  dom.biProgressWrap.style.display = 'none';
+  dom.biStart.disabled = false;
+  _biTogglePadField();
+  _biToggleTargetRow();
+  dom.batchImgOverlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  // load thumbnails + check size
+  items.forEach((it, i) => _biLoadImage(i));
+}
+
+async function _biLoadImage(i) {
+  const it = _bi.items[i];
+  try {
+    const resp = await fetch('/api/file?path=' + encodeURIComponent(it.path), { method: 'GET', credentials: 'include' });
+    if (!resp.ok) throw new Error('加载失败');
+    // Early reject via Content-Length if available (avoid downloading huge files)
+    const cl = parseInt(resp.headers.get('content-length') || '0', 10);
+    if (cl && cl > 50 * 1024 * 1024) { it.tooBig = true; _biRenderList(); return; }
+    const blob = await resp.blob();
+    if (blob.size > 50 * 1024 * 1024) { it.tooBig = true; _biRenderList(); return; }
+    it.origBlob = blob;
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      it.el = img; it.loaded = true;
+      _biRenderList();
+      if (_bi.selIdx === i) _biRenderPreview();
+    };
+    img.onerror = () => { it.tooBig = true; _biRenderList(); };
+    img.src = url;
+  } catch (_) {
+    it.tooBig = true; _biRenderList();
+  }
+}
+
+function _biRenderList() {
+  let h = '';
+  _bi.items.forEach((it, i) => {
+    const sel = i === _bi.selIdx ? 'background:var(--bg-hover);outline:1px solid var(--accent)' : '';
+    const th = it.el ? `<img src="${it.el.src}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;pointer-events:none">` : (it.tooBig ? '<span style="color:var(--danger);font-size:18px">⚠</span>' : '<div class="spinner" style="width:16px;height:16px"></div>');
+    const label = it.tooBig ? `${escapeHtml(it.name)} <span style="color:var(--danger);font-size:10px">超50M</span>` : escapeHtml(it.name);
+    h += `<div class="bi-list-item" data-i="${i}" draggable="true" style="display:flex;gap:8px;align-items:center;padding:6px;border-radius:6px;cursor:pointer;${sel}"><span style="color:var(--muted);cursor:grab;font-size:12px">⋮⋮</span>${th}<span style="font-size:12px;word-break:break-all;flex:1;pointer-events:none">${label}</span></div>`;
+  });
+  dom.batchList.innerHTML = h;
+  $$('.bi-list-item', dom.batchList).forEach(el => {
+    el.addEventListener('click', () => {
+      _bi.selIdx = +el.dataset.i;
+      _biRenderList();
+      _biRenderPreview();
+    });
+    el.addEventListener('dragstart', (e) => { _biDragFromIdx = +el.dataset.i; e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const to = +el.dataset.i;
+      const from = _biDragFromIdx;
+      _biDragFromIdx = null;
+      if (from == null || from === to) return;
+      const arr = _bi.items, moved = arr.splice(from, 1)[0];
+      arr.splice(to, 0, moved);
+      if (_bi.selIdx === from) _bi.selIdx = to;
+      else if (from < _bi.selIdx && to >= _bi.selIdx) _bi.selIdx--;
+      else if (from > _bi.selIdx && to <= _bi.selIdx) _bi.selIdx++;
+      _biRenderList(); _biRenderPreview(); _biUpdateNamePreview();
+    });
+  });
+}
+
+function _biReadSettings() {
+  return {
+    width: parseInt(dom.biWidth.value, 10) || 0,
+    height: parseInt(dom.biHeight.value, 10) || 0,
+    widthAuto: dom.biWidthAuto.checked,
+    heightAuto: dom.biHeightAuto.checked,
+    crop: dom.biCrop.value,
+    padColor: dom.biPadColor.value,
+    focal: dom.biFocal.value,
+    format: dom.biFormat.value,
+    quality: parseInt(dom.biQuality.value, 10) / 100,
+    rename: dom.biRename.value || 'ORIGINAL-NAME_xxx',
+    renameStart: parseInt(dom.biRenameStart.value, 10) || 0,
+    prep: _bi && _bi.prep ? _bi.prep : { rotation: 0, flipH: false, flipV: false },
+    wmLayers: _bi ? _bi.wmLayers : [],
+    unit: dom.biUnit.value,
+    hq: dom.biHq.checked,
+    borderEnable: dom.biBorderEnable.checked,
+    borderColor: dom.biBorderColor.value,
+    borderW: parseInt(dom.biBorderW.value, 10) || 0,
+    borderRadius: parseInt(dom.biBorderRadius.value, 10) || 0,
+    keepExif: dom.biKeepExif.checked,
+  };
+}
+
+function _biComputeOutDims(natW, natH, s) {
+  const pct = s.unit === 'pct';
+  const toAbs = (v) => pct ? Math.round(natW * v / 100) : v; // width uses natW scale; height below uses natH
+  let w = s.widthAuto ? null : (pct ? Math.round(natW * s.width / 100) : s.width);
+  let h = s.heightAuto ? null : (pct ? Math.round(natH * s.height / 100) : s.height);
+  if (w && !h) h = Math.round(w * natH / natW);
+  if (h && !w) w = Math.round(h * natW / natH);
+  if (!w && !h) { w = natW; h = natH; }
+  w = Math.max(1, w); h = Math.max(1, h);
+  return { w, h };
+}
+
+function _biOutMime(s, ext) {
+  if (s.format !== 'keep') return s.format;
+  for (const [mime, exts] of Object.entries(BI_KEEP_EXT)) if (exts.includes(ext)) return mime;
+  return 'image/png';
+}
+
+function _biOutExt(mime, ext) {
+  if (mime === 'image/jpeg') return 'jpg';
+  if (mime === 'image/webp') return 'webp';
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/avif') return 'avif';
+  if (mime === 'image/gif') return 'gif';
+  return ext || 'png';
+}
+
+function _biApplyRename(template, origName, index, w, h, startNum) {
+  const base = origName.replace(/\.[^.]+$/, '');
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const xMatch = template.match(/x{2,}/);
+  const padLen = xMatch ? xMatch[0].length : 3;
+  const num = String(startNum + index).padStart(padLen, '0');
+  let out = template
+    .replace(/ORIGINAL-NAME/g, base)
+    .replace(/x{2,}/g, num)
+    .replace(/\{w\}/g, w)
+    .replace(/\{h\}/g, h)
+    .replace(/\{date\}/g, date);
+  return out;
+}
+
+// --- AVIF support detection ---
+let _avifSupported = null;
+function _biAvifSupported() {
+  if (_avifSupported !== null) return Promise.resolve(_avifSupported);
+  return new Promise((resolve) => {
+    const c = document.createElement('canvas');
+    c.width = 2; c.height = 2;
+    c.toBlob((b) => {
+      _avifSupported = !!(b && b.type === 'image/avif');
+      resolve(_avifSupported);
+    }, 'image/avif');
+  });
+}
+
+// --- smartcrop lazy loader ---
+let _smartcropPromise = null;
+function _loadSmartcrop() {
+  if (window.smartcrop) return Promise.resolve(window.smartcrop);
+  if (_smartcropPromise) return _smartcropPromise;
+  _smartcropPromise = new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/smartcrop.js@2.0.5/dist/smartcrop.min.js';
+    s.onload = () => resolve(window.smartcrop || null);
+    s.onerror = () => { _smartcropPromise = null; resolve(null); };
+    document.head.appendChild(s);
+  });
+  return _smartcropPromise;
+}
+
+async function _biSmartCrop(src, outW, outH, item) {
+  const key = `${outW}x${outH}`;
+  if (item._smart && item._smart.key === key) return item._smart.crop;
+  const sc = await _loadSmartcrop();
+  if (!sc) return null;
+  try {
+    const res = await sc.crop(src, { width: outW, height: outH, minScale: 0.5 });
+    const top = res && res.topCrop;
+    if (top) { item._smart = { key, crop: { x: top.x, y: top.y, width: top.width, height: top.height } }; return item._smart.crop; }
+  } catch (_) {}
+  return null;
+}
+
+// --- pre-process (rotate/flip) ---
+function _biSrcDims(src) {
+  if (src instanceof HTMLCanvasElement) return { w: src.width, h: src.height };
+  return { w: src.naturalWidth, h: src.naturalHeight };
+}
+function _biApplyPrep(img, prep) {
+  if (!prep || (!prep.rotation && !prep.flipH && !prep.flipV)) return img;
+  const rot = (prep.rotation || 0) % 360;
+  const swap = rot === 90 || rot === 270;
+  const sw = img.naturalWidth, sh = img.naturalHeight;
+  const w = swap ? sh : sw, h = swap ? sw : sh;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.scale(prep.flipH ? -1 : 1, prep.flipV ? -1 : 1);
+  ctx.drawImage(img, -sw / 2, -sh / 2);
+  return c;
+}
+
+// --- watermark layers (text + image, optional tiling) ---
+function _biPosXY(pos, W, H, dw, dh, m) {
+  let x, y, align;
+  if (pos === 'br') { align = 'right'; x = W - m; y = H - m - dh / 2; }
+  else if (pos === 'bl') { align = 'left'; x = m; y = H - m - dh / 2; }
+  else if (pos === 'tr') { align = 'right'; x = W - m; y = m + dh / 2; }
+  else if (pos === 'tl') { align = 'left'; x = m; y = m + dh / 2; }
+  else { align = 'center'; x = W / 2; y = H / 2; }
+  return { x, y, align };
+}
+function _biDrawWatermarks(ctx, W, H, s) {
+  if (!s.wmLayers || !s.wmLayers.length) return;
+  for (const l of s.wmLayers) {
+    if (!l.enabled) continue;
+    if (l.type === 'text') {
+      if (!l.text) continue;
+      ctx.save();
+      ctx.globalAlpha = l.opacity;
+      ctx.fillStyle = l.color;
+      ctx.font = `${l.size}px sans-serif`;
+      ctx.textBaseline = 'middle';
+      const m = 12;
+      const { x, y, align } = _biPosXY(l.pos, W, H, ctx.measureText(l.text).width, l.size, m);
+      ctx.textAlign = align;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 2; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
+      ctx.fillText(l.text, x, y);
+      ctx.restore();
+    } else if (l.type === 'image' && l.imgEl) {
+      const base = Math.min(W, H) * (l.imgScale || 0.2);
+      const iw = l.imgEl.naturalWidth, ih = l.imgEl.naturalHeight;
+      const sc = base / Math.min(iw, ih);
+      const dw = iw * sc, dh = ih * sc;
+      ctx.save();
+      ctx.globalAlpha = l.opacity;
+      if (l.tile) {
+        const stepX = Math.max(1, dw * 1.4), stepY = Math.max(1, dh * 1.4);
+        for (let yy = 0; yy < H; yy += stepY) {
+          for (let xx = 0; xx < W; xx += stepX) {
+            ctx.drawImage(l.imgEl, xx, yy, dw, dh);
+          }
+        }
+      } else {
+        const m = 12;
+        const { x: cx, y: cy, align } = _biPosXY(l.pos, W, H, dw, dh, m);
+        let dx = cx;
+        if (align === 'right') dx = cx - dw;
+        else if (align === 'center') dx = cx - dw / 2;
+        let dy = cy - dh / 2;
+        ctx.drawImage(l.imgEl, dx, dy, dw, dh);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+// --- border (with optional rounded corners) ---
+function _biDrawBorder(ctx, W, H, s) {
+  if (!s.borderEnable || s.borderW <= 0) return;
+  const t = s.borderW, r = s.borderRadius || 0;
+  ctx.save();
+  ctx.fillStyle = s.borderColor;
+  if (r <= 0) {
+    ctx.fillRect(0, 0, W, t);
+    ctx.fillRect(0, H - t, W, t);
+    ctx.fillRect(0, 0, t, H);
+    ctx.fillRect(W - t, 0, t, H);
+  } else {
+    // draw rounded border via a ring path (outer rounded minus inner rounded)
+    const rr = Math.min(r, W / 2, H / 2);
+    ctx.beginPath();
+    _biRoundRectPath(ctx, 0, 0, W, H, rr);
+    _biRoundRectPath(ctx, t, t, W - 2 * t, H - 2 * t, Math.max(0, rr - t));
+    ctx.fill('evenodd');
+  }
+  ctx.restore();
+}
+function _biRoundRectPath(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// --- pica (high-quality resize) lazy loader ---
+let _picaPromise = null;
+function _loadPica() {
+  if (window.pica) return Promise.resolve(window.pica);
+  if (_picaPromise) return _picaPromise;
+  _picaPromise = new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js';
+    s.onload = () => resolve(window.pica || null);
+    s.onerror = () => { _picaPromise = null; resolve(null); };
+    document.head.appendChild(s);
+  });
+  return _picaPromise;
+}
+async function _biResizeHq(srcCanvas, dstCanvas) {
+  const p = await _loadPica();
+  if (!p) { dstCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, dstCanvas.width, dstCanvas.height); return; }
+  await p.resize(srcCanvas, dstCanvas, { alpha: true });
+}
+
+// --- EXIF APP1 preservation (JPEG only) ---
+async function _biExtractExifApp1(blob) {
+  try {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const dv = new DataView(bytes.buffer);
+    if (bytes.length < 4 || dv.getUint16(0) !== 0xFFD8) return null;
+    let off = 2;
+    while (off < bytes.length - 4) {
+      const marker = dv.getUint16(off);
+      if (marker === 0xFFE1) {
+        const len = dv.getUint16(off + 2);
+        if (len >= 8 && bytes[off+4]===0x45 && bytes[off+5]===0x78 && bytes[off+6]===0x69 && bytes[off+7]===0x66) {
+          return bytes.slice(off, off + 2 + len);
+        }
+      }
+      if ((marker & 0xFF00) !== 0xFF00) break;
+      if (marker === 0xFFD9 || marker === 0xFFDA) break;
+      const len = dv.getUint16(off + 2);
+      off += 2 + len;
+    }
+  } catch (_) {}
+  return null;
+}
+async function _biInjectExif(outBlob, app1) {
+  if (!app1) return outBlob;
+  const out = new Uint8Array(await outBlob.arrayBuffer());
+  const dv = new DataView(out.buffer);
+  if (out.length < 4 || dv.getUint16(0) !== 0xFFD8) return outBlob;
+  const r = new Uint8Array(2 + app1.length + (out.length - 2));
+  r.set(out.slice(0, 2), 0);
+  r.set(app1, 2);
+  r.set(out.slice(2), 2 + app1.length);
+  return new Blob([r], { type: 'image/jpeg' });
+}
+
+// --- main processing pipeline (async due to smartcrop/pica) ---
+async function _biProcessImage(item, s) {
+  const src = _biApplyPrep(item.el, s.prep);
+  const { w: pw, h: ph } = _biSrcDims(src);
+  const { w: outW, h: outH } = _biComputeOutDims(pw, ph, s);
+  let outMime = _biOutMime(s, item.ext);
+  if (outMime === 'image/avif' && !(await _biAvifSupported())) {
+    if (!window._biAvifToastShown) { window._biAvifToastShown = true; showToast('浏览器不支持 AVIF，已回退到 WebP', 'error'); }
+    outMime = 'image/webp';
+  }
+
+  // Determine source content region
+  let region = { sx: 0, sy: 0, sw: pw, sh: ph };
+  if (s.crop === 'crop') {
+    const aspect = outW / outH;
+    let ww, wh;
+    if (pw / ph > aspect) { ww = ph * aspect; wh = ph; } else { ww = pw; wh = pw / aspect; }
+    let cx = pw / 2, cy = ph / 2;
+    if (s.focal === 'manual' && item.focal) { cx = item.focal.x * pw; cy = item.focal.y * ph; }
+    else if (s.focal === 'smart') {
+      const crop = await _biSmartCrop(src, outW, outH, item);
+      if (crop) region = { sx: crop.x, sy: crop.y, sw: crop.width, sh: crop.height };
+      else { region = { sx: Math.max(0, Math.min(cx - ww/2, pw - ww)), sy: Math.max(0, Math.min(cy - wh/2, ph - wh)), sw: ww, sh: wh }; }
+    } else {
+      region = { sx: Math.max(0, Math.min(cx - ww/2, pw - ww)), sy: Math.max(0, Math.min(cy - wh/2, ph - wh)), sw: ww, sh: wh };
+    }
+  }
+
+  // Build content canvas at source-region resolution
+  const content = document.createElement('canvas');
+  content.width = Math.max(1, Math.round(region.sw));
+  content.height = Math.max(1, Math.round(region.sh));
+  content.getContext('2d').drawImage(src, region.sx, region.sy, region.sw, region.sh, 0, 0, content.width, content.height);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+
+  const fillBg = () => { if (outMime === 'image/jpeg') { ctx.fillStyle = s.padColor || '#ffffff'; ctx.fillRect(0, 0, outW, outH); } };
+
+  if (s.crop === 'pad') {
+    fillBg();
+    if (outMime !== 'image/jpeg') { ctx.fillStyle = s.padColor || '#ffffff'; ctx.fillRect(0, 0, outW, outH); }
+    const scale = Math.min(outW / pw, outH / ph);
+    const dw = Math.max(1, Math.round(pw * scale));
+    const dh = Math.max(1, Math.round(ph * scale));
+    // resize whole src into a contained canvas, then composite
+    if (s.hq) {
+      const tmp = document.createElement('canvas'); tmp.width = dw; tmp.height = dh;
+      await _biResizeHq(src, tmp);
+      ctx.drawImage(tmp, (outW - dw) / 2, (outH - dh) / 2);
+    } else {
+      ctx.drawImage(src, (outW - dw) / 2, (outH - dh) / 2, dw, dh);
+    }
+  } else {
+    // stretch or crop: content → target (fills)
+    if (s.hq && (content.width !== outW || content.height !== outH)) {
+      await _biResizeHq(content, canvas);
+    } else {
+      ctx.drawImage(content, 0, 0, outW, outH);
+    }
+    // for jpeg, fill bg first was skipped — do it before drawImage to avoid black for transparent
+    // (content has no alpha from a photo; for PNG sources exported to jpeg, fill bg)
+    if (outMime === 'image/jpeg') {
+      // re-do: we already drew; to keep bg under transparent pixels, redraw with bg
+      const tmp = document.createElement('canvas'); tmp.width = outW; tmp.height = outH;
+      const tctx = tmp.getContext('2d');
+      tctx.fillStyle = s.padColor || '#ffffff'; tctx.fillRect(0, 0, outW, outH);
+      tctx.drawImage(canvas, 0, 0);
+      ctx.clearRect(0, 0, outW, outH);
+      ctx.drawImage(tmp, 0, 0);
+    }
+  }
+
+  _biDrawBorder(ctx, outW, outH, s);
+  _biDrawWatermarks(ctx, outW, outH, s);
+  return { canvas, w: outW, h: outH, outMime };
+}
+
+let _biPreviewToken = 0;
+async function _biRenderPreview() {
+  if (!_bi) return;
+  const it = _bi.items[_bi.selIdx];
+  dom.biPreviewName.textContent = it ? it.name : '';
+  if (!it || !it.loaded) { dom.batchPreviewWrap.innerHTML = '<div class="settings-hint">图片加载中或无法预览</div>'; dom.batchPreviewInfo.textContent = ''; return; }
+  const s = _biReadSettings();
+  dom.biResetFocal.style.display = (s.focal === 'manual' && it.focal) ? '' : 'none';
+  const myToken = ++_biPreviewToken;
+  try {
+    const { canvas, w, h, outMime } = await _biProcessImage(it, s);
+    if (myToken !== _biPreviewToken) return; // a newer render superseded
+    const maxDim = 520;
+    const dispScale = Math.min(1, maxDim / Math.max(canvas.width, canvas.height));
+    const disp = document.createElement('canvas');
+    disp.width = Math.round(canvas.width * dispScale);
+    disp.height = Math.round(canvas.height * dispScale);
+    disp.getContext('2d').drawImage(canvas, 0, 0, disp.width, disp.height);
+    dom.batchPreviewWrap.innerHTML = '';
+    disp.style.maxWidth = '100%'; disp.style.maxHeight = '100%'; disp.style.border = '1px solid var(--border)'; disp.style.borderRadius = '6px';
+    disp.dataset.biDisp = '1';
+    dom.batchPreviewWrap.appendChild(disp);
+    // focal marker
+    if (s.focal === 'manual' && it.focal) {
+      const mk = document.createElement('div');
+      mk.style.cssText = `position:absolute;left:${it.focal.x * 100}%;top:${it.focal.y * 100}%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;border:2px solid #fff;background:rgba(137,180,250,0.6);box-shadow:0 0 0 1px #000;pointer-events:none`;
+      dom.batchPreviewWrap.appendChild(mk);
+    }
+    const outName = _biApplyRename(s.rename, it.name, _bi.selIdx, w, h, s.renameStart) + '.' + _biOutExt(outMime, it.ext);
+    dom.batchPreviewInfo.textContent = `${it.name} → ${outName} (${w}×${h}, ${outMime.replace('image/', '')})`;
+    _bi._lastProcCanvas = canvas; // for compare
+    _bi._lastSrcForCompare = it.el;
+  } catch (err) {
+    dom.batchPreviewInfo.textContent = '预览失败: ' + err.message;
+  }
+}
+
+function _biRenderOriginal() {
+  const it = _bi.items[_bi.selIdx];
+  if (!it || !it.loaded) return;
+  const s = _biReadSettings();
+  const src = _biApplyPrep(it.el, s.prep);
+  const maxDim = 520;
+  const { w, h } = _biSrcDims(src);
+  const dispScale = Math.min(1, maxDim / Math.max(w, h));
+  const disp = document.createElement('canvas');
+  disp.width = Math.round(w * dispScale); disp.height = Math.round(h * dispScale);
+  disp.getContext('2d').drawImage(src, 0, 0, disp.width, disp.height);
+  dom.batchPreviewWrap.innerHTML = '';
+  disp.style.maxWidth = '100%'; disp.style.maxHeight = '100%'; disp.style.border = '1px solid var(--border)'; disp.style.borderRadius = '6px';
+  dom.batchPreviewWrap.appendChild(disp);
+}
+
+function _biUpdateNamePreview() {
+  if (!_bi || !_bi.items.length) return;
+  const it = _bi.items[0];
+  const s = _biReadSettings();
+  if (!it.loaded) { dom.biNamePreview.textContent = '（图片加载中...）'; return; }
+  const src = _biApplyPrep(it.el, s.prep);
+  const { w, h } = _biSrcDims(src);
+  const { w: ow, h: oh } = _biComputeOutDims(w, h, s);
+  const outMime = _biOutMime(s, it.ext);
+  const outName = _biApplyRename(s.rename, it.name, 0, ow, oh, s.renameStart) + '.' + _biOutExt(outMime, it.ext);
+  dom.biNamePreview.textContent = outName;
+}
+
+function _biTogglePadField() { dom.biPadField.style.display = dom.biCrop.value === 'pad' ? '' : 'none'; }
+function _biToggleTargetRow() { dom.biTargetRow.style.display = dom.biOutput.value === 'dir' ? '' : 'none'; }
+
+async function _biEnsureTargetDir() {
+  if (_bi.targetDir === '') return true;
+  try {
+    await apiBrowse(_bi.targetDir);
+    return true;
+  } catch (_) { return false; }
+}
+
+function _biPickDir() {
+  // reuse a simple browse modal
+  let cwd = _bi.targetDir || '';
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  overlay.style.display = 'flex'; overlay.style.zIndex = '4000';
+  overlay.innerHTML = `
+    <div class="dialog-modal" style="width:520px">
+      <div class="dialog-header"><h3>选择目标目录</h3><button class="btn-icon" title="关闭">&times;</button></div>
+      <div class="dialog-body" style="display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow:hidden">
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn-secondary" data-up style="padding:5px 10px">上级</button>
+          <span class="settings-hint" data-path style="flex:1;font-family:var(--mono);word-break:break-all"></span>
+        </div>
+        <div data-grid style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" data-cancel>取消</button>
+        <button class="btn-primary" data-ok>选择此目录</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const grid = overlay.querySelector('[data-grid]');
+  const pathEl = overlay.querySelector('[data-path]');
+  const close = () => overlay.remove();
+  overlay.querySelector('.btn-icon').addEventListener('click', close);
+  overlay.querySelector('[data-cancel]').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('[data-up]').addEventListener('click', () => { cwd = cwd.split('/').slice(0, -1).join('/'); render(); });
+  overlay.querySelector('[data-ok]').addEventListener('click', () => {
+    _bi.targetDir = cwd;
+    dom.biTargetPath.textContent = '/' + cwd;
+    close();
+  });
+  async function render() {
+    pathEl.textContent = '/' + cwd;
+    grid.innerHTML = '<div class="settings-hint">加载中...</div>';
+    try {
+      const data = await apiBrowse(cwd);
+      const dirs = (data.entries || []).filter(e => e.type === 'directory');
+      grid.innerHTML = '';
+      if (cwd) { const d = document.createElement('div'); d.textContent='📁 ..'; d.style.cssText='cursor:pointer;padding:6px;border-radius:4px'; d.addEventListener('click',()=>{cwd=cwd.split('/').slice(0,-1).join('/');render();}); grid.appendChild(d); }
+      dirs.forEach(dd => {
+        const d = document.createElement('div');
+        d.textContent = '📁 ' + dd.name;
+        d.style.cssText = 'cursor:pointer;padding:6px;border-radius:4px';
+        d.addEventListener('mouseenter',()=>d.style.background='var(--bg-hover)');
+        d.addEventListener('mouseleave',()=>d.style.background='');
+        d.addEventListener('click', () => { cwd = cwd ? cwd + '/' + dd.name : dd.name; render(); });
+        grid.appendChild(d);
+      });
+      if (!grid.children.length) grid.innerHTML = '<div class="settings-hint">无子目录</div>';
+    } catch (err) { grid.innerHTML = `<div class="settings-hint" style="color:var(--danger)">${escapeHtml(err.message)}</div>`; }
+  }
+  render();
+}
+
+async function _biProcessAll() {
+  dom.biError.textContent = '';
+  const s = _biReadSettings();
+  _biSaveSettings();
+  if (dom.biOutput.value === 'dir' && !(await _biEnsureTargetDir())) {
+    dom.biError.textContent = '请选择有效的目标目录'; return;
+  }
+  // gather existing names in target dir to avoid overwrite
+  if (dom.biOutput.value === 'dir' && _bi.targetDir !== '') {
+    try {
+      const data = await apiBrowse(_bi.targetDir);
+      _bi.existingNames = new Set((data.entries || []).map(e => e.name));
+    } catch (_) { _bi.existingNames = new Set(); }
+  } else { _bi.existingNames = new Set(); }
+  _bi.cancel = false;
+  dom.biProgressWrap.style.display = 'flex';
+  dom.biStart.disabled = true;
+  dom.biProgress.max = _bi.items.length;
+  dom.biProgress.value = 0;
+  dom.biProgressText.textContent = `0/${_bi.items.length}`;
+  const results = [];
+  const blobs = []; // for zip
+  for (let i = 0; i < _bi.items.length; i++) {
+    if (_bi.cancel) break;
+    const it = _bi.items[i];
+    try {
+      if (!it.loaded) throw new Error('图片未加载');
+      if (it.tooBig) throw new Error('超过50MB上限');
+      const { canvas, w, h, outMime } = await _biProcessImage(it, s);
+      let blob = await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('导出失败')), outMime, s.quality));
+      // EXIF preservation: JPEG source -> JPEG output, when keepExif enabled
+      if (s.keepExif && outMime === 'image/jpeg' && (it.ext === 'jpg' || it.ext === 'jpeg') && it.origBlob) {
+        const app1 = await _biExtractExifApp1(it.origBlob);
+        if (app1) blob = await _biInjectExif(blob, app1);
+      }
+      const baseName = _biApplyRename(s.rename, it.name, i, w, h, s.renameStart);
+      const ext = _biOutExt(outMime, it.ext);
+      let outName = baseName + '.' + ext;
+      // avoid overwrite: append _1, _2... if exists (default don't overwrite)
+      if (_bi.existingNames.has(outName)) {
+        let n = 1;
+        while (_bi.existingNames.has(`${baseName}_${n}.${ext}`)) n++;
+        outName = `${baseName}_${n}.${ext}`;
+      }
+      _bi.existingNames.add(outName);
+      results.push({ name: outName, blob, ok: true });
+      blobs.push({ name: outName, blob });
+    } catch (err) {
+      results.push({ name: it.name, ok: false, error: err.message });
+    }
+    dom.biProgress.value = i + 1;
+    dom.biProgressText.textContent = `${i + 1}/${_bi.items.length}`;
+  }
+  // output
+  _bi.lastResults = null;
+  try {
+    if (dom.biOutput.value === 'zip') {
+      const zipBlob = await _biMakeZip(blobs);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = `images_${Date.now()}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } else {
+      // upload each to target dir (or root if empty)
+      const dir = _bi.targetDir || '';
+      const saved = [];
+      for (const r of results) {
+        if (!r.ok) continue;
+        const fd = new FormData();
+        fd.append('uploadDir', dir);
+        fd.append('files', r.blob, r.name);
+        try { await apiUpload(fd); saved.push({ name: r.name, path: dir ? dir + '/' + r.name : r.name }); }
+        catch (e) { r.ok = false; r.error = e.message; }
+      }
+      _bi.lastResults = saved;
+    }
+  } catch (err) { dom.biError.textContent = '输出失败: ' + err.message; }
+  const ok = results.filter(r => r.ok).length;
+  const fail = results.length - ok;
+  let msg = `处理完成 ${ok}/${results.length}`;
+  if (fail > 0) msg += `，${fail} 个失败`;
+  showToast(msg, fail > 0 ? 'error' : 'success');
+  if (dom.biOutput.value === 'dir') refreshCurrent();
+  // show "→ AI 工作流" button only when we have saved image paths in a dir
+  dom.biToAi.style.display = (_bi.lastResults && _bi.lastResults.length) ? '' : 'none';
+  dom.biStart.disabled = false;
+  dom.biProgressWrap.style.display = 'none';
+  // record history (only if something was processed)
+  if (results.length) {
+    _biRecordHistory({
+      id: Date.now(),
+      time: new Date().toISOString(),
+      count: results.length, ok, fail,
+      outputMode: dom.biOutput.value,
+      settings: { ...s, wmLayers: _biSerializeWmLayers(), prep: _bi.prep },
+      inputNames: _bi.items.map(it => it.name),
+      outputNames: results.map(r => r.name),
+    });
+  }
+}
+
+// Minimal store-mode (no compression) ZIP builder in the browser
+function _biMakeZip(files) {
+  const crcTable = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+  const crc32 = (buf) => { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const enc = new TextEncoder();
+  const parts = [], central = []; let offset = 0;
+  return (async () => {
+    for (const f of files) {
+      const data = new Uint8Array(await f.blob.arrayBuffer());
+      const nameBuf = enc.encode(f.name);
+      const crc = crc32(data), size = data.length;
+      const lh = new Uint8Array(30);
+      const dv = new DataView(lh.buffer);
+      dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true);
+      dv.setUint16(8, 0, true); dv.setUint16(10, 0, true);
+      dv.setUint32(14, crc, true); dv.setUint32(18, size, true); dv.setUint32(22, size, true);
+      dv.setUint16(26, nameBuf.length, true); dv.setUint16(28, 0, true);
+      parts.push(lh, nameBuf, data);
+      const cd = new Uint8Array(46); const cdv = new DataView(cd.buffer);
+      cdv.setUint32(0, 0x02014b50, true); cdv.setUint16(4, 20, true);
+      cdv.setUint16(8, 0, true); cdv.setUint16(10, 0, true);
+      cdv.setUint32(16, crc, true); cdv.setUint32(20, size, true); cdv.setUint32(24, size, true);
+      cdv.setUint16(28, nameBuf.length, true); cdv.setUint16(30, 0, true); cdv.setUint16(32, 0, true);
+      cdv.setUint16(34, 0, true); cdv.setUint32(38, 0, true); cdv.setUint32(42, offset, true);
+      central.push(cd, nameBuf);
+      offset += lh.length + nameBuf.length + data.length;
+    }
+    const centralBuf = _concatU8(central);
+    const end = new Uint8Array(22); const ev = new DataView(end.buffer);
+    ev.setUint32(0, 0x06054b50, true); ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+    ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+    ev.setUint32(12, centralBuf.length, true); ev.setUint32(16, offset, true); ev.setUint16(20, 0, true);
+    return new Blob([_concatU8(parts), centralBuf, end], { type: 'application/zip' });
+  })();
+  function _concatU8(arr) { let len = 0; for (const a of arr) len += a.length; const r = new Uint8Array(len); let o = 0; for (const a of arr) { r.set(a, o); o += a.length; } return r; }
+}
+
+function closeBatchImages() {
+  dom.batchImgOverlay.classList.add('hidden');
+  document.body.style.overflow = '';
+  _bi = null;
+}
+
+// Wire up events
+dom.ctxBatchImages.addEventListener('click', () => {
+  if (!contextTarget) return;
+  const imgs = [];
+  if (state.selected.size > 0) {
+    for (const p of state.selected) {
+      const ext = (p.split('.').pop() || '').toLowerCase();
+      if (BI_IMG_EXTS.includes(ext)) imgs.push(p);
+    }
+  }
+  if (!imgs.length) imgs.push(getFilePath(contextTarget));
+  hideContextMenu();
+  openBatchImages(imgs);
+});
+dom.batchImgClose.addEventListener('click', closeBatchImages);
+dom.batchImgOverlay.addEventListener('click', e => { if (e.target === dom.batchImgOverlay) closeBatchImages(); });
+dom.biCrop.addEventListener('change', () => { _biTogglePadField(); _biRenderPreview(); _biUpdateNamePreview(); _biSaveSettings(); });
+dom.biFormat.addEventListener('change', () => { _biRenderPreview(); _biUpdateNamePreview(); _biSaveSettings(); });
+dom.biQuality.addEventListener('input', () => { dom.biQualityVal.textContent = dom.biQuality.value; _biSaveSettings(); });
+dom.biWidth.addEventListener('input', () => { _biRenderPreview(); _biUpdateNamePreview(); });
+dom.biHeight.addEventListener('input', () => { _biRenderPreview(); _biUpdateNamePreview(); });
+dom.biWidthAuto.addEventListener('change', () => { _biRenderPreview(); _biUpdateNamePreview(); _biSaveSettings(); });
+dom.biHeightAuto.addEventListener('change', () => { _biRenderPreview(); _biUpdateNamePreview(); _biSaveSettings(); });
+dom.biPadColor.addEventListener('input', () => { _biRenderPreview(); _biSaveSettings(); });
+dom.biRename.addEventListener('input', () => { _biRenderPreview(); _biUpdateNamePreview(); });
+dom.biRenameStart.addEventListener('input', () => { _biRenderPreview(); _biUpdateNamePreview(); });
+dom.biOutput.addEventListener('change', () => { _biToggleTargetRow(); _biSaveSettings(); });
+dom.biPickDir.addEventListener('click', _biPickDir);
+dom.biStart.addEventListener('click', _biProcessAll);
+dom.biCancel.addEventListener('click', () => { _bi.cancel = true; });
+
+// P1 extras wiring
+dom.biFocal.addEventListener('change', () => { _biRenderPreview(); _biSaveSettings(); });
+// pre-process buttons
+dom.biRotL.addEventListener('click', () => { if (_bi) { _bi.prep.rotation = (_bi.prep.rotation + 270) % 360; _biUpdatePrepInfo(); _biInvalidateItemCaches(); _biRenderPreview(); _biSaveSettings(); } });
+dom.biRotR.addEventListener('click', () => { if (_bi) { _bi.prep.rotation = (_bi.prep.rotation + 90) % 360; _biUpdatePrepInfo(); _biInvalidateItemCaches(); _biRenderPreview(); _biSaveSettings(); } });
+dom.biFlipH.addEventListener('click', () => { if (_bi) { _bi.prep.flipH = !_bi.prep.flipH; _biUpdatePrepInfo(); _biInvalidateItemCaches(); _biRenderPreview(); _biSaveSettings(); } });
+dom.biFlipV.addEventListener('click', () => { if (_bi) { _bi.prep.flipV = !_bi.prep.flipV; _biUpdatePrepInfo(); _biInvalidateItemCaches(); _biRenderPreview(); _biSaveSettings(); } });
+dom.biPrepReset.addEventListener('click', () => { if (_bi) { _bi.prep = { rotation: 0, flipH: false, flipV: false }; _biUpdatePrepInfo(); _biInvalidateItemCaches(); _biRenderPreview(); _biSaveSettings(); } });
+// watermark + border (layer-based; layer inputs are wired in _biRenderWmLayers)
+['input','change'].forEach(ev => {
+  dom.biBorderColor.addEventListener(ev, _biRenderPreview);
+  dom.biBorderW.addEventListener(ev, _biRenderPreview);
+  dom.biBorderRadius.addEventListener(ev, _biRenderPreview);
+});
+dom.biWmAddText.addEventListener('click', () => { if (_bi) { _bi.wmLayers.push(_biWmNewText()); _biRenderWmLayers(); _biRenderPreview(); _biSaveSettings(); } });
+dom.biWmAddImg.addEventListener('click', () => dom.biWmImgInput.click());
+dom.biWmImgInput.addEventListener('change', () => {
+  const f = dom.biWmImgInput.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    if (_bi) { _bi.wmLayers.push(Object.assign(_biWmNewImage(), { imgEl: img })); _biRenderWmLayers(); _biRenderPreview(); _biSaveSettings(); }
+  };
+  img.src = URL.createObjectURL(f);
+  dom.biWmImgInput.value = '';
+});
+dom.biBorderEnable.addEventListener('change', _biRenderPreview);
+// P2: unit, HQ, EXIF
+dom.biUnit.addEventListener('change', () => { _biUpdateUnitLabels(); _biRenderPreview(); _biUpdateNamePreview(); _biSaveSettings(); });
+dom.biHq.addEventListener('change', () => { _biRenderPreview(); _biSaveSettings(); });
+dom.biKeepExif.addEventListener('change', _biSaveSettings);
+// presets
+dom.biPreset.addEventListener('change', () => { if (dom.biPreset.value) _biApplyPreset(dom.biPreset.value); });
+dom.biPresetSave.addEventListener('click', () => {
+  const name = prompt('预设名称'); if (!name) return;
+  const ps = _biPresets(); ps[name] = _biReadSettings(); ps[name].prep = _bi ? _bi.prep : null;
+  localStorage.setItem('_bi_presets', JSON.stringify(ps)); _biRefreshPresets(); dom.biPreset.value = name;
+  showToast(`已保存预设「${name}」`, 'success');
+});
+dom.biPresetDel.addEventListener('click', () => {
+  const name = dom.biPreset.value; if (!name) return;
+  const ps = _biPresets(); delete ps[name]; localStorage.setItem('_bi_presets', JSON.stringify(ps)); _biRefreshPresets();
+  showToast(`已删除预设「${name}」`, 'success');
+});
+// P3: preset import/export + history
+dom.biPresetExport.addEventListener('click', _biExportPresets);
+dom.biPresetImport.addEventListener('click', () => dom.biPresetImportInput.click());
+dom.biPresetImportInput.addEventListener('change', () => {
+  const f = dom.biPresetImportInput.files[0]; if (f) _biImportPresets(f);
+  dom.biPresetImportInput.value = '';
+});
+dom.biHistory.addEventListener('click', () => { _biRenderHistory(); dom.biHistoryOverlay.classList.remove('hidden'); });
+dom.biHistoryClose.addEventListener('click', () => dom.biHistoryOverlay.classList.add('hidden'));
+dom.biHistoryOverlay.addEventListener('click', e => { if (e.target === dom.biHistoryOverlay) dom.biHistoryOverlay.classList.add('hidden'); });
+dom.biHistoryClear.addEventListener('click', () => {
+  if (!confirm('清空全部批量处理历史？')) return;
+  localStorage.removeItem('_bi_history'); _biRenderHistory();
+});
+// P3: shared presets + admin default
+dom.biSharedLoad.addEventListener('click', _biLoadSharedPreset);
+dom.biSharedPublish.addEventListener('click', _biPublishSharedPreset);
+dom.biSharedDefault.addEventListener('click', _biSetSharedDefault);
+// before/after compare (hold to show original)
+dom.biCompare.addEventListener('mousedown', () => { _bi._holdProc = true; if (_bi) _biRenderOriginal(); });
+const _biRestoreProc = () => { if (_bi && _bi._holdProc) { _bi._holdProc = false; _biRenderPreview(); } };
+dom.biCompare.addEventListener('mouseup', _biRestoreProc);
+dom.biCompare.addEventListener('mouseleave', _biRestoreProc);
+dom.biCompare.addEventListener('touchstart', (e) => { e.preventDefault(); _bi._holdProc = true; if (_bi) _biRenderOriginal(); }, { passive: false });
+dom.biCompare.addEventListener('touchend', _biRestoreProc);
+// manual focal: click on preview canvas
+dom.batchPreviewWrap.addEventListener('click', (e) => {
+  if (!_bi) return;
+  const s = _biReadSettings();
+  if (s.focal !== 'manual') return;
+  const disp = dom.batchPreviewWrap.querySelector('canvas[data-bi-disp]');
+  if (!disp) return;
+  const rect = disp.getBoundingClientRect();
+  const nx = (e.clientX - rect.left) / rect.width;
+  const ny = (e.clientY - rect.top) / rect.height;
+  _bi.items[_bi.selIdx].focal = { x: Math.max(0, Math.min(1, nx)), y: Math.max(0, Math.min(1, ny)) };
+  _biRenderPreview();
+});
+dom.biResetFocal.addEventListener('click', () => {
+  if (_bi && _bi.items[_bi.selIdx]) { _bi.items[_bi.selIdx].focal = null; _biRenderPreview(); }
+});
+
+// P2: run AI workflow on saved results
+dom.biToAi.addEventListener('click', async () => {
+  if (!_bi || !_bi.lastResults || !_bi.lastResults.length) return;
+  const paths = _bi.lastResults.map(r => r.path);
+  try {
+    const data = await apiGetJson('/api/ai/workflows-for-images');
+    const wfs = data.workflows || [];
+    if (!wfs.length) { showToast('无图片输入类型的 AI 工作流', 'error'); return; }
+    // simple picker
+    const overlay = document.createElement('div');
+    overlay.className = 'preview-overlay'; overlay.style.display = 'flex'; overlay.style.zIndex = '4000';
+    overlay.innerHTML = `<div class="dialog-modal" style="width:420px"><div class="dialog-header"><h3>选择 AI 工作流</h3></div>
+      <div class="dialog-body" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto">
+      ${wfs.map(w => `<button class="btn-secondary" data-wfid="${escapeHtml(w.id)}" style="text-align:left;padding:8px">${escapeHtml(w.name)}${w.imageInputCount>1?` ·${w.imageInputCount}图`:''}</button>`).join('')}
+      </div><div class="dialog-footer"><button class="btn-secondary" data-cancel>取消</button></div></div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('[data-cancel]').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    $$('[data-wfid]', overlay).forEach(btn => btn.addEventListener('click', async () => {
+      const wfId = btn.dataset.wfid;
+      const wf = wfs.find(w => w.id === wfId);
+      close();
+      try {
+        if (wf && wf.imageInputCount > 1) {
+          showToast('多图工作流请从文件管理器右键使用', 'error'); return;
+        }
+        const r = await apiPostJson('/api/ai/tasks/batch', {
+          workflowId: wfId,
+          imageRefs: paths.map(path => ({ rootId: 'main', path })),
+        });
+        showToast(`已对 ${r.count} 张结果提交 AI 任务`, 'success');
+        dom.biToAi.style.display = 'none';
+      } catch (e) { showToast('提交失败: ' + e.message, 'error'); }
+    }));
+  } catch (err) { showToast('加载工作流失败: ' + err.message, 'error'); }
+});
+
+// P2: drag-reorder image list
+let _biDragFromIdx = null;
+function _biBindListDrag() {
+  // delegated handlers attached once in _biRenderList via draggable attr
+}
+
+function _biInvalidateItemCaches() {
+  if (!_bi) return;
+  _bi.items.forEach(it => { it._smart = null; });
 }
 
 dom.ctxRename.addEventListener('click', () => {
@@ -2120,6 +4014,9 @@ dom.ctxDelete.addEventListener('click', () => {
 document.addEventListener('click', (e) => {
   if (!dom.contextMenu.classList.contains('hidden') && !dom.contextMenu.contains(e.target)) {
     hideContextMenu();
+  }
+  if (!dom.ctxAiSub.classList.contains('hidden') && !dom.ctxAiSub.contains(e.target) && !dom.ctxAi.contains(e.target)) {
+    hideAiSubmenu();
   }
 });
 

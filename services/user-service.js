@@ -2,11 +2,19 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const USERS_FILE = path.join(__dirname, '..', 'users.json');
+const USERS_FILE = process.env.FILE_MANAGER_USERS_FILE
+  ? path.resolve(process.env.FILE_MANAGER_USERS_FILE)
+  : path.join(__dirname, '..', 'users.json');
 const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 1000;
 
 const sessionStore = new Map();
+
+function userSessionVersion(user) {
+  return crypto.createHash('sha256')
+    .update(`${user.username}\0${user.passwordHash}\0${user.isAdmin ? '1' : '0'}`)
+    .digest('hex');
+}
 
 // PBKDF2 password hashing
 function hashPassword(password, salt) {
@@ -20,7 +28,8 @@ function verifyPassword(password, storedHash) {
   if (parts.length < 2) return false;
   const [salt, hash] = parts;
   const verify = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha256').toString('hex');
-  return hash === verify;
+  if (hash.length !== verify.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(verify));
 }
 
 function loadUsers() {
@@ -62,6 +71,8 @@ async function createDefaultAdmin() {
 }
 
 function createSession(username, isAdmin) {
+  const user = loadUsers().find(item => item.username === username);
+  if (!user) return null;
   if (sessionStore.size >= MAX_SESSIONS) {
     let oldestKey = null;
     let oldestExpires = Infinity;
@@ -74,7 +85,12 @@ function createSession(username, isAdmin) {
     if (oldestKey) sessionStore.delete(oldestKey);
   }
   const token = crypto.randomBytes(32).toString('hex');
-  sessionStore.set(token, { username, isAdmin: !!isAdmin, expiresAt: Date.now() + SESSION_MAX_AGE });
+  sessionStore.set(token, {
+    username,
+    isAdmin: !!user.isAdmin,
+    userVersion: userSessionVersion(user),
+    expiresAt: Date.now() + SESSION_MAX_AGE,
+  });
   return token;
 }
 
@@ -86,6 +102,12 @@ function validateSession(token) {
     sessionStore.delete(token);
     return null;
   }
+  const user = loadUsers().find(item => item.username === session.username);
+  if (!user || session.userVersion !== userSessionVersion(user)) {
+    sessionStore.delete(token);
+    return null;
+  }
+  session.isAdmin = !!user.isAdmin;
   session.expiresAt = Date.now() + SESSION_MAX_AGE;
   return session;
 }
@@ -94,12 +116,13 @@ function destroySession(token) {
   if (token) sessionStore.delete(token);
 }
 
-setInterval(() => {
+const sessionCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [token, session] of sessionStore) {
     if (now > session.expiresAt) sessionStore.delete(token);
   }
 }, 5 * 60 * 1000);
+sessionCleanupTimer.unref();
 
 module.exports = {
   hashPassword,
@@ -111,4 +134,5 @@ module.exports = {
   validateSession,
   destroySession,
   SESSION_MAX_AGE,
+  USERS_FILE,
 };

@@ -1,19 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const {
   loadUsers,
   saveUsers,
   hashPassword,
   verifyPassword,
 } = require('../services/user-service');
-
-function requireAdmin(req, res, next) {
-  if (!req.user || !req.user.isAdmin) {
-    return res.status(403).json({ error: '需要管理员权限', code: 'FORBIDDEN' });
-  }
-  next();
-}
 
 router.get('/users', requireAdmin, (req, res) => {
   const users = loadUsers();

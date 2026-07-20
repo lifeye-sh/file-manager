@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 多媒体工作台 — 界面设计稿</title>
+<style>
+  /* === Tokens (match file-manager Catppuccin Mocha) === */
+  :root{
+    --bg-primary:#1e1e2e; --bg-secondary:#181825; --bg-tertiary:#11111b;
+    --surface:#313244; --active:#45475a;
+    --text:#cdd6f4; --text-2:#a6adc8; --muted:#6c7086;
+    --accent:#89b4fa; --accent-2:#74c7ec;
+    --border:#313244; --border-2:#45475a;
+    --danger:#f38ba8; --success:#a6e3a1; --warning:#f9e2af;
+    --c-image:#f5c2e7; --c-video:#a6e3a1; --c-text:#94e2d5; --c-int:#89b4fa; --c-float:#b4befe;
+    --mono:'Cascadia Code','JetBrains Mono','Fira Code',Consolas,monospace;
+    --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+    --r:8px; --t:.18s ease;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--ui); background:var(--bg-primary); color:var(--text);
+    overflow:hidden; font-size:13px; -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--active);border-radius:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* === App Shell === */
+  .app{display:flex;flex-direction:column;height:100vh}
+  .topbar{
+    display:flex;align-items:center;gap:12px;padding:0 16px;height:52px;min-height:52px;
+    background:var(--bg-secondary);border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--accent);white-space:nowrap}
+  .brand .logo{font-size:18px}
+  .wf-name{
+    font-family:var(--mono);font-size:13px;color:var(--text-2);padding:4px 10px;
+    border:1px solid var(--border);border-radius:6px;background:var(--bg-tertiary);min-width:160px;
+  }
+  .wf-name .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--success);margin-right:6px;vertical-align:middle}
+  .topbar .spacer{flex:1}
+  .btn{
+    padding:6px 12px;border-radius:6px;font-size:12px;border:1px solid var(--border);
+    background:var(--bg-tertiary);color:var(--text-2);transition:all var(--t);display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn:hover{background:var(--surface);color:var(--text)}
+  .btn.primary{background:var(--accent);color:var(--bg-tertiary);border-color:var(--accent);font-weight:600}
+  .btn.primary:hover{opacity:.88}
+  .btn.danger{color:var(--danger);border-color:var(--border-2)}
+  .btn.danger:hover{background:rgba(243,139,168,.12)}
+  .btn.warn{color:var(--warning);border-color:var(--border-2)}
+  .btn.warn:hover{background:rgba(249,226,175,.12)}
+  .btn.icon{padding:6px 8px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* === Workflow tabs === */
+  .wf-tabs{display:flex;align-items:center;gap:2px;padding:6px 12px 0;background:var(--bg-secondary);border-bottom:1px solid var(--border);overflow-x:auto}
+  .wf-tab{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px 6px 0 0;font-size:12px;color:var(--text-2);background:var(--bg-tertiary);border:1px solid var(--border);border-bottom:none;cursor:pointer;white-space:nowrap;transition:all var(--t);max-width:200px}
+  .wf-tab .wt-name{overflow:hidden;text-overflow:ellipsis}
+  .wf-tab .wt-x{width:14px;height:14px;border-radius:3px;text-align:center;line-height:14px;font-size:11px;color:var(--muted)}
+  .wf-tab .wt-x:hover{background:var(--surface);color:var(--danger)}
+  .wf-tab .wt-dirty{width:6px;height:6px;border-radius:50%;background:var(--warning)}
+  .wf-tab.active{background:var(--bg-primary);color:var(--text);border-color:var(--border-2);margin-bottom:-1px;padding-bottom:7px}
+  .wf-tab.active::after{content:'';position:absolute}
+  .wf-add{padding:6px 10px;border-radius:6px;color:var(--muted);font-size:14px;cursor:pointer}
+  .wf-add:hover{background:var(--surface);color:var(--accent)}
+
+  /* === Queue status bar === */
+  .queue-bar{
+    display:flex;align-items:center;gap:18px;padding:0 16px;height:36px;min-height:36px;
+    background:var(--bg-tertiary);border-bottom:1px solid var(--border);font-size:12px;
+  }
+  .qstat{display:flex;align-items:center;gap:6px;color:var(--text-2)}
+  .qstat .label{color:var(--muted)}
+  .qstat .val{font-family:var(--mono);color:var(--text)}
+  .qstat.running .val{color:var(--accent)}
+  .qpill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:10px;background:rgba(137,180,250,.12);color:var(--accent);font-size:11px}
+  .qpill .pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+
+  /* === Main 3-column === */
+  .main{flex:1;display:flex;min-height:0}
+  .pane{background:var(--bg-secondary);border-1:1px solid var(--border)}
+  .pane-left{width:240px;min-width:240px;border-right:1px solid var(--border);display:flex;flex-direction:column}
+  .pane-right{width:320px;min-width:320px;border-left:1px solid var(--border);display:flex;flex-direction:column}
+  .pane-center{flex:1;position:relative;overflow:hidden;background:var(--bg-primary)}
+  .pane-h{height:40px;min-height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+
+  /* === Left: node library === */
+  .lib{flex:1;overflow-y:auto;padding:8px}
+  .lib-cat{margin-bottom:10px}
+  .lib-cat-h{display:flex;align-items:center;gap:6px;padding:4px 4px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .lib-cat-h .chev{font-size:9px;transition:transform var(--t)}
+  .lib-item{
+    display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:grab;
+    color:var(--text-2);font-size:12px;transition:background var(--t);border:1px solid transparent;
+  }
+  .lib-item:hover{background:var(--surface);color:var(--text);border-color:var(--border)}
+  .lib-item.dragging{opacity:.4}
+  .lib-item .ico{font-size:14px;width:18px;text-align:center}
+  .lib-item .tag{margin-left:auto;font-size:10px;color:var(--muted);font-family:var(--mono)}
+  .lib-item .swatch{width:8px;height:8px;border-radius:50%;margin-left:auto}
+  .lib-item .lib-del{display:none;width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;color:var(--muted);border-radius:3px;margin-left:2px;flex-shrink:0}
+  .lib-item:hover .lib-del{display:block}
+  .lib-item .lib-del:hover{background:var(--surface);color:var(--danger)}
+
+  /* === Center: canvas === */
+  .canvas-grid{
+    position:absolute;inset:0;
+    background-image:radial-gradient(circle, rgba(205,214,244,.06) 1px, transparent 1px);
+    background-size:22px 22px;
+  }
+  .canvas-content{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
+  .canvas-content .connections{position:absolute;width:4000px;height:3000px;pointer-events:none;overflow:visible}
+  .canvas-zoom{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px;z-index:20}
+  .canvas-zoom .btn{padding:4px 8px;font-size:13px}
+  .canvas-hint{position:absolute;left:12px;bottom:12px;font-size:11px;color:var(--muted);font-family:var(--mono);z-index:20}
+  .connections{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .conn{fill:none;stroke-width:2;opacity:.85}
+  .conn.image{stroke:var(--c-image)} .conn.video{stroke:var(--c-video)}
+  .conn.text{stroke:var(--c-text)} .conn.int{stroke:var(--c-int)} .conn.float{stroke:var(--c-float)}
+  .conn.selected{stroke-width:3;filter:drop-shadow(0 0 4px currentColor)}
+  .conn-arrow{fill:context-stroke}
+
+  /* === Node card === */
+  .node{
+    position:absolute;min-width:200px;background:var(--bg-secondary);border:1px solid var(--border-2);
+    border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:12px;z-index:5;
+  }
+  .node.selected{outline:2px solid var(--accent);outline-offset:1px}
+  .node.executing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(137,180,250,.25)}
+  .node-h{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:move}
+  .node-h .ico{font-size:14px}
+  .node-h .title{flex:1;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node-h .type-badge{font-size:9px;padding:1px 6px;border-radius:8px;background:var(--surface);color:var(--text-2);text-transform:uppercase;letter-spacing:.04em}
+  .node-h .x{width:18px;height:18px;border-radius:4px;color:var(--muted);font-size:14px;line-height:18px;text-align:center}
+  .node-h .x:hover{background:var(--surface);color:var(--danger)}
+  .status-badge{
+    position:absolute;top:-9px;right:10px;font-size:10px;padding:1px 7px;border-radius:9px;
+    background:var(--bg-secondary);border:1px solid var(--border-2);color:var(--text-2);font-weight:600;
+  }
+  .status-badge.queued{color:var(--warning)} .status-badge.running{color:var(--accent);border-color:var(--accent)}
+  .status-badge.done{color:var(--success)} .status-badge.failed{color:var(--danger)}
+  .status-badge.skipped{color:var(--muted)}
+  .status-badge.running::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:4px;animation:pulse 1.4s infinite;vertical-align:middle}
+  .node-logs{position:absolute;left:0;right:0;top:100%;margin-top:6px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:10px;color:var(--text-2);max-height:54px;overflow:hidden;line-height:1.5}
+  .node-logs .ll{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node-logs .ll.err{color:var(--danger)} .node-logs .ll.ok{color:var(--success)}
+
+  .ports{padding:8px 10px;display:flex;gap:10px}
+  .ports-col{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+  .ports-col.in{align-items:flex-start} .ports-col.out{align-items:flex-end}
+  .port{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-2);white-space:nowrap}
+  .ports-col.out .port{flex-direction:row-reverse}
+  .port .pdot{width:10px;height:10px;border-radius:50%;border:2px solid;background:var(--bg-secondary);flex-shrink:0}
+  .port.any .pdot{border-color:var(--text-muted)}
+  .port.drag-src .pdot{background:var(--accent);border-color:var(--accent)}
+  .port.drop-hot .pdot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(137,180,250,.25)}
+  .port.drop-hot{background:rgba(137,180,250,.12);border-radius:4px}
+  .port.image .pdot{border-color:var(--c-image)} .port.video .pdot{border-color:var(--c-video)}
+  .port.text .pdot{border-color:var(--c-text)} .port.int .pdot{border-color:var(--c-int)}
+  .port.float .pdot{border-color:var(--c-float)}
+  .port .pn{color:var(--text-2)} .port .pt{color:var(--muted);font-size:9px;font-family:var(--mono)}
+
+  .node-body{padding:8px 10px;border-top:1px solid var(--border);flex:1;min-height:0;display:flex;flex-direction:column}
+  .node-handle{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;z-index:5;display:flex;align-items:flex-end;justify-content:flex-end;padding:2px}
+  .node-handle::before{content:'';border-style:solid;border-width:0 0 11px 11px;border-color:transparent transparent var(--border-2) transparent;border-radius:0 0 2px 0}
+  .node-handle:hover::before{border-color:transparent transparent var(--accent) transparent}
+  /* inline editors */
+  .ed-file{display:flex;align-items:center;gap:8px}
+  .ed-file .thumb{width:56px;height:56px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:var(--bg-tertiary);flex-shrink:0}
+  .ed-file .thumb.placeholder{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted)}
+  .ed-file .meta{font-size:10px;color:var(--muted);font-family:var(--mono);min-width:0}
+  .ed-file .meta .src{color:var(--text-2);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+  .ed-file .meta .hint{display:block;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+  .ed-file .pick{font-size:10px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;color:var(--text-2);background:var(--bg-tertiary);flex-shrink:0}
+  .ed-file .pick:hover{background:var(--surface);color:var(--text)}
+  .ed-text{width:100%;min-height:48px;flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:11px;resize:none;outline:none}
+  .ed-text:focus{border-color:var(--accent)}
+  .ed-num{display:flex;align-items:center;gap:6px}
+  .ed-num input{width:72px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:11px;outline:none}
+  .ed-num input:focus{border-color:var(--accent)}
+  .ed-num .unit{font-size:10px;color:var(--muted)}
+  .ed-ports{display:flex;flex-direction:column;gap:5px}
+  .ed-port-row{display:flex;align-items:center;gap:6px;font-size:10px}
+  .ed-port-row .pn{color:var(--text-2);min-width:70px}
+  .ed-port-row input{flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none}
+  .ed-port-row .hide{font-size:9px;color:var(--muted);padding:2px 5px;border-radius:4px}
+  .ed-port-row .hide:hover{background:var(--surface);color:var(--text)}
+
+  /* === Right panel === */
+  .tabs{display:flex;border-bottom:1px solid var(--border)}
+  .tab{padding:9px 14px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent;transition:all var(--t)}
+  .tab:hover{color:var(--text-2)}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .pane-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column}
+
+  /* Resource library grid (right pane) */
+  .res-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border:1px solid var(--border);border-radius:6px;cursor:grab;transition:all var(--t);text-align:center}
+  .res-item:hover{border-color:var(--accent);background:var(--surface)}
+  .res-item.dragging{opacity:.4}
+  .res-item .ri-thumb{width:56px;height:56px;border-radius:4px;object-fit:cover;background:var(--bg-tertiary);border:1px solid var(--border)}
+  .res-item .ri-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted)}
+  .res-item .ri-name{font-size:10px;color:var(--text-2);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pane-section{margin-bottom:14px}
+  .pane-section h4{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600}
+
+  /* properties */
+  .prop-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px dashed var(--border)}
+  .prop-row .k{color:var(--text-2)} .prop-row .v{color:var(--text);font-family:var(--mono);font-size:11px}
+  .prop-row .v.accent{color:var(--accent)}
+
+  /* log */
+  .log-bar{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+  .log-bar select,.log-bar .btn{font-size:11px;padding:3px 8px}
+  .log{font-family:var(--mono);font-size:11px;line-height:1.6;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:8px;max-height:420px;overflow-y:auto}
+  .log .ln{display:flex;gap:8px;white-space:pre-wrap;word-break:break-word}
+  .log .ts{color:var(--muted);flex-shrink:0} .log .lv{flex-shrink:0;width:42px;font-weight:600}
+  .log .lv.info{color:var(--accent)} .log .lv.warn{color:var(--warning)} .log .lv.err{color:var(--danger)} .log .lv.ok{color:var(--success)}
+  .log .st{color:var(--muted);flex-shrink:0}
+
+  /* history */
+  .task-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg-tertiary);cursor:pointer;transition:all var(--t)}
+  .task-row:hover{border-color:var(--accent);background:var(--surface)}
+  .task-row .tthumb{width:44px;height:44px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0}
+  .task-row .tthumb.placeholder{display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)}
+  .task-row .tinfo{flex:1;min-width:0}
+  .task-row .tname{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .task-row .tmeta{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+  .task-row .tactions{display:flex;gap:4px;flex-shrink:0}
+  .task-row .tactions .btn{padding:3px 7px;font-size:10px}
+  .tstatus{font-size:10px;padding:1px 7px;border-radius:9px;font-weight:600}
+  .tstatus.completed{color:var(--success);background:rgba(166,227,161,.12)}
+  .tstatus.failed{color:var(--danger);background:rgba(243,139,168,.12)}
+  .tstatus.running{color:var(--accent);background:rgba(137,180,250,.12)}
+  .tstatus.queued{color:var(--warning);background:rgba(249,226,175,.12)}
+  .tstatus.aborted{color:var(--muted);background:rgba(108,112,134,.18)}
+
+  /* === Modal / Drawer overlays === */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;display:none;animation:fade .2s}
+  .overlay.show{display:block}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-secondary);border:1px solid var(--border-2);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.5);z-index:901;display:none}
+  .modal.show{display:flex;flex-direction:column}
+  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .modal-h h3{font-size:15px;font-weight:600}
+  .modal-body{padding:18px;overflow-y:auto;flex:1}
+  .modal-f{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
+
+  /* file picker modal */
+  .picker{width:720px;max-width:94vw;max-height:80vh}
+  .picker-tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--border)}
+  .picker-tab{padding:10px 14px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent}
+  .picker-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .picker-path{font-family:var(--mono);font-size:11px;color:var(--muted);padding:8px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+  .picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;padding:14px 18px;max-height:380px;overflow-y:auto}
+  .pick-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all var(--t)}
+  .pick-item:hover{border-color:var(--accent);background:var(--surface)}
+  .pick-item.sel{border-color:var(--accent);background:rgba(137,180,250,.1)}
+  .pick-item .pi-thumb{width:64px;height:64px;border-radius:6px;object-fit:cover;background:var(--bg-tertiary);border:1px solid var(--border)}
+  .pick-item .pi-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--muted)}
+  .pick-item .pi-name{font-size:10px;color:var(--text-2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .pick-task-group{padding:8px 18px}
+  .pick-task-group .ptg-h{font-size:11px;color:var(--text-2);font-weight:600;margin:8px 0 6px;display:flex;align-items:center;gap:8px}
+  .pick-task-group .ptg-h .tid{font-family:var(--mono);color:var(--muted);font-size:10px}
+  .pick-task-group .ptg-h .tstatus{font-size:9px}
+
+  /* task detail drawer (right slide) */
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:var(--bg-secondary);border-left:1px solid var(--border-2);box-shadow:-16px 0 48px rgba(0,0,0,.4);z-index:901;transform:translateX(100%);transition:transform var(--t);display:flex;flex-direction:column}
+  .drawer.show{transform:translateX(0)}
+  .drawer-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .drawer-h .dt-title{font-size:14px;font-weight:600}
+  .drawer-h .dt-title .dt-id{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:400;margin-left:8px}
+  .drawer-tabs{display:flex;gap:0;border-bottom:1px solid var(--border)}
+  .drawer-tab{padding:10px 16px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent}
+  .drawer-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .drawer-body{flex:1;overflow-y:auto;padding:16px 18px}
+  .res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+  .res-card{border:1px solid var(--border);border-radius:8px;background:var(--bg-tertiary);overflow:hidden}
+  .res-card .rc-thumb{width:100%;height:96px;object-fit:cover;background:var(--bg-secondary);display:block}
+  .res-card .rc-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--muted)}
+  .res-card .rc-body{padding:8px 10px}
+  .res-card .rc-name{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res-card .rc-path{font-size:9px;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .res-card .rc-actions{display:flex;gap:4px;margin-top:7px;flex-wrap:wrap}
+  .res-card .rc-actions .btn{padding:3px 7px;font-size:10px}
+  .res-input-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border)}
+  .res-input-row .ri-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0}
+  .res-input-row .ri-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--muted)}
+  .res-input-row .ri-info{flex:1;min-width:0}
+  .res-input-row .ri-node{font-size:10px;color:var(--muted)}
+  .res-input-row .ri-val{font-size:12px;color:var(--text);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* result card popup (bottom-right of canvas) */
+  .result-pop{position:fixed;right:20px;bottom:20px;width:280px;background:var(--bg-secondary);border:1px solid var(--success);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);z-index:800;display:none}
+  .result-pop.show{display:block}
+  .result-pop .rp-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--success);font-weight:600}
+  .result-pop .rp-body{padding:12px;display:flex;gap:10px;align-items:center}
+  .result-pop .rp-thumb{width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid var(--border)}
+  .result-pop .rp-actions{display:flex;flex-direction:column;gap:5px;flex:1}
+  .result-pop .rp-actions .btn{font-size:11px;padding:5px 8px}
+
+  /* === Task dock (bottom, always visible) === */
+  .task-dock{background:var(--bg-secondary);border-top:1px solid var(--border);display:flex;flex-direction:column;height:220px;min-height:38px;transition:height var(--t)}
+  .task-dock.collapsed{height:38px!important}
+
+  /* === Splitters (drag to resize) === */
+  .splitter{background:var(--border);flex-shrink:0;position:relative;transition:background var(--t);z-index:30}
+  .splitter:hover{background:var(--accent)}
+  .splitter.v-split{width:4px;cursor:col-resize}
+  .splitter.h-split{height:4px;cursor:row-resize;width:100%}
+  .splitter::after{content:'';position:absolute;inset:0;margin:auto;opacity:0;transition:opacity var(--t);border-radius:2px;background:var(--muted)}
+  .splitter.v-split::after{width:2px;height:24px}
+  .splitter.h-split::after{height:2px;width:28px}
+  .splitter:hover::after{opacity:.7}
+  .splitter.dragging{background:var(--accent)}
+  .task-dock.dragging{transition:none}
+
+  /* === Canvas drop zone (drag media onto canvas) === */
+  .drop-zone{position:absolute;inset:14px;border:2px dashed var(--accent);border-radius:12px;background:rgba(137,180,250,.07);display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--accent);pointer-events:none;z-index:60}
+  .drop-zone.show{display:flex;animation:fade .15s}
+  .drop-zone .dz-icon{font-size:40px;letter-spacing:6px}
+  .drop-zone .dz-title{font-size:15px;font-weight:600}
+  .drop-zone .dz-hint{font-size:11px;color:var(--text-2)}
+  .node.dropped{animation:nodepop .18s ease-out}
+  @keyframes nodepop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+  .dock-h{display:flex;align-items:center;gap:14px;padding:0 12px;height:36px;min-height:36px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer;user-select:none}
+  .dock-h .dh-title{font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.03em;font-size:11px}
+  .dock-h .dh-counts{display:flex;gap:14px;color:var(--muted)}
+  .dock-h .dh-counts .c{display:flex;align-items:center;gap:5px}
+  .dock-h .dh-counts .c .n{font-family:var(--mono);color:var(--text)}
+  .dock-h .dh-counts .c.running .n{color:var(--accent)} .dock-h .dh-counts .c.queued .n{color:var(--warning)} .dock-h .dh-counts .c.done .n{color:var(--success)} .dock-h .dh-counts .c.failed .n{color:var(--danger)}
+  .dock-h .spacer{flex:1}
+  .dock-h .chev{color:var(--muted);font-size:10px;transition:transform var(--t)}
+  .task-dock.collapsed .dock-h .chev{transform:rotate(-90deg)}
+  .dock-body{overflow-y:auto;flex:1}
+  .task-table{width:100%;border-collapse:collapse;font-size:12px}
+  .task-table th{text-align:left;padding:7px 12px;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-secondary)}
+  .task-table td{padding:7px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .task-table tr{cursor:pointer;transition:background var(--t)}
+  .task-table tr:hover{background:var(--surface)}
+  .task-table tr.running td:first-child{border-left:2px solid var(--accent)}
+  .task-table .tt-id{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .task-table .tt-wf{color:var(--text)}
+  .task-table .tt-prog{font-family:var(--mono);font-size:11px;color:var(--text-2)}
+  .task-table .tt-time{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .task-table .tt-actions{display:flex;gap:4px}
+  .task-table .tt-actions .btn{padding:2px 7px;font-size:10px}
+  .task-table .pbar{width:80px;height:5px;border-radius:3px;background:var(--bg-tertiary);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}
+  .task-table .pbar .pfill{height:100%;background:var(--accent);border-radius:3px}
+  .task-table .pbar.done .pfill{background:var(--success)} .task-table .pbar.failed .pfill{background:var(--danger)}
+
+  .hidden{display:none!important}
+  .divider{height:1px;background:var(--border);margin:10px 0}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5}
+
+  @media(max-width:900px){
+    .pane-left{display:none} .pane-right{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== TOP BAR ===== -->
+  <div class="topbar">
+    <div class="brand"><span class="logo">🧪</span><span>AI 工作台</span></div>
+    <span class="hint" id="wfIdLabel" style="font-family:var(--mono)">未打开工作流</span>
+    <button class="btn" id="btnOpenWf">📂 打开</button>
+    <select class="btn" id="wfSelect" style="appearance:auto;min-width:140px;font-family:inherit;font-size:12px;padding:6px 8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;max-width:200px;">
+      <option value="">打开工作流...</option>
+    </select>
+    <button class="btn" id="btnRename">↺ 重命名</button>
+    <button class="btn" id="btnSave">保存</button>
+    <button class="btn" id="btnSaveAs">另存为</button>
+    <div class="spacer"></div>
+    <button class="btn icon" id="btnClearSel" title="清空选择">✕ 选择</button>
+    <button class="btn icon" id="btnAiSettings" title="AI 工作台设置">⚙</button>
+    <input type="number" id="execCount" value="1" min="1" max="100" title="执行次数" style="width:50px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 4px;font-family:var(--mono);font-size:12px;text-align:center;outline:none">
+    <span style="font-size:11px;color:var(--muted)">次</span>
+    <button class="btn primary" id="btnRun">▶ 执行</button>
+  </div>
+
+  <!-- ===== WORKFLOW TABS (multi-open) ===== -->
+  <div class="wf-tabs" id="wfTabs"></div>
+
+  <!-- ===== QUEUE STATUS BAR ===== -->
+  <div class="queue-bar">
+    <div class="qstat hidden" id="qPill">
+      <span class="qpill"><span class="pulse"></span>运行中</span>
+      <span class="label">当前执行</span>
+      <span class="val" id="qCurId">—</span>
+      <span class="label">· 步骤</span>
+      <span class="val" id="qCurStep">0/0</span>
+      <span class="label">·</span>
+      <span class="val" id="qCurName">—</span>
+    </div>
+    <div class="qstat"><span class="label">运行中</span><span class="val" id="qRunning">0</span></div>
+    <div class="qstat"><span class="label">待执行</span><span class="val" id="qPending">0</span></div>
+    <div style="flex:1"></div>
+    <div class="qstat"><span class="label">ComfyUI</span><span class="val" id="qComfy" style="color:var(--muted)">● 未知</span></div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+
+    <!-- ===== LEFT: Node Library ===== -->
+    <div class="pane pane-left">
+      <div class="pane-h"><span>节点库</span><button class="btn icon" id="libAdd" title="上传自定义节点">＋</button></div>
+      <div class="lib" id="nodeLib"></div>
+    </div>
+    <div class="splitter v-split" id="splitLeft" title="拖拽调整节点库宽度"></div>
+
+    <!-- ===== CENTER: Canvas ===== -->
+    <div class="pane pane-center">
+      <div class="canvas-grid"></div>
+
+      <!-- Canvas content (pan/zoom transformed; nodes + connections live here) -->
+      <div class="canvas-content" id="canvasContent">
+        <svg class="connections" id="connLayer" viewBox="0 0 4000 3000" preserveAspectRatio="none">
+          <defs>
+            <marker id="ah-image" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#f5c2e7"/></marker>
+            <marker id="ah-text" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#94e2d5"/></marker>
+            <marker id="ah-int" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#89b4fa"/></marker>
+            <marker id="ah-video" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a6e3a1"/></marker>
+            <marker id="ah-float" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b4befe"/></marker>
+          </defs>
+        </svg>
+      </div>
+
+      <div class="canvas-hint">拖拽节点 · 滚轮缩放 · 拖端口连线 · Del 删除选中 · 把图片/视频直接拖到画布生成输入节点</div>
+      <div class="canvas-zoom">
+        <button class="btn icon">＋</button>
+        <button class="btn icon">－</button>
+        <button class="btn icon">⤢</button>
+      </div>
+
+      <!-- Drop zone overlay (shown while dragging media over canvas) -->
+      <div class="drop-zone" id="dropZone">
+        <div class="dz-icon">🖼 🎬</div>
+        <div class="dz-title">松开以创建图片/视频输入节点</div>
+        <div class="dz-hint">支持多文件，每个文件生成一个输入节点</div>
+      </div>
+    </div>
+    <div class="splitter v-split" id="splitRight" title="拖拽调整属性面板宽度"></div>
+
+    <!-- ===== RIGHT: Properties / Log / Resources ===== -->
+    <div class="pane pane-right">
+      <div class="tabs">
+        <button class="tab active" data-rtab="resources">资源库</button>
+        <button class="tab" data-rtab="props">属性</button>
+        <button class="tab" data-rtab="log">执行日志</button>
+      </div>
+      <div class="pane-body" id="rpaneBody">
+        <!-- Resource library tab (default active) -->
+        <div class="rpane" data-rpane="resources">
+          <div class="tabs" style="margin:-12px -12px 10px -12px;border-bottom:1px solid var(--border)">
+            <button class="tab active" data-res-tab="fm">文件管理器</button>
+            <button class="tab" data-res-tab="tasks">历史任务结果</button>
+          </div>
+          <div data-res-pane="fm" style="display:flex;flex-direction:column;flex:1;min-height:0">
+            <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+              <select id="resFilter" class="btn" style="font-size:11px;padding:4px 8px;font-family:inherit;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;appearance:auto">
+                <option value="">全部文件</option>
+                <option value="image">仅图片</option>
+                <option value="video">仅视频</option>
+              </select>
+              <input type="text" id="resSearch" class="search-input" placeholder="搜索…" style="flex:1;min-width:80px;font-size:11px;padding:5px 8px">
+              <button class="btn icon" id="resUp" title="上级目录" style="padding:2px 6px;font-size:14px">↩</button>
+            </div>
+            <div id="resPath" style="font-size:10px;color:var(--muted);margin-bottom:6px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📁 /</div>
+            <div id="resGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;overflow-y:auto;flex:1"></div>
+          </div>
+          <div data-res-pane="tasks" style="display:none;flex-direction:column;flex:1;min-height:0">
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <select id="resTaskFilter" class="btn" style="font-size:11px;padding:4px 8px;font-family:inherit;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;appearance:auto">
+                <option value="image">仅图片</option>
+                <option value="video">仅视频</option>
+              </select>
+            </div>
+            <div id="resTaskGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;overflow-y:auto;flex:1"></div>
+          </div>
+        </div>
+
+        <!-- Properties tab -->
+        <div class="rpane" data-rpane="props">
+          <div class="hint">选中一个节点查看属性</div>
+        </div>
+
+        <!-- Log tab -->
+        <div class="rpane hidden" data-rpane="log">
+          <div class="hint">暂无日志</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="splitter h-split" id="splitDock" title="拖拽调整任务列表高度"></div>
+
+  <!-- ===== TASK DOCK (always visible) ===== -->
+  <div class="task-dock" id="taskDock">
+    <div class="dock-h" id="dockH">
+      <span class="dh-title">任务列表</span>
+      <div class="dh-counts">
+        <div class="c running"><span>运行中</span><span class="n" id="dockRunning">0</span></div>
+        <div class="c queued"><span>待执行</span><span class="n" id="dockQueued">0</span></div>
+        <div class="c done"><span>已完成</span><span class="n" id="dockDone">0</span></div>
+        <div class="c failed"><span>失败</span><span class="n" id="dockFailed">0</span></div>
+      </div>
+      <div class="spacer"></div>
+      <span class="hint" style="font-family:var(--mono)">点击行查看详情 · 点击标题栏折叠</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="dock-body" id="dockBody"></div>
+  </div>
+</div>
+<div class="overlay" id="overlay"></div>
+<input type="file" id="defUpload" accept=".json,application/json" style="display:none">
+
+<!-- AI Workbench settings modal -->
+<div class="modal" id="aiSettings" style="width:460px;max-width:94vw">
+  <div class="modal-h"><h3>AI 工作台设置</h3><button class="btn icon" id="aiSettingsClose">×</button></div>
+  <div class="modal-body">
+    <div class="settings-field" style="margin-bottom:16px">
+      <label for="aiComfyUrl">ComfyUI 地址</label>
+      <input type="text" id="aiComfyUrl" class="settings-input" placeholder="http://127.0.0.1:8188" style="font-family:inherit">
+      <span class="settings-hint">ComfyUI 后台地址，默认本机 8188 端口</span>
+    </div>
+    <div class="settings-field" style="margin-bottom:16px">
+      <label for="aiExecTimeout">执行超时(秒)</label>
+      <input type="number" id="aiExecTimeout" class="settings-input" value="600" min="30" style="font-family:inherit">
+      <span class="settings-hint">单个 ComfyUI 任务的最大执行时间</span>
+    </div>
+    <div class="settings-field" style="margin-bottom:16px">
+      <label for="aiWorkDir">工作目录</label>
+      <input type="text" id="aiWorkDir" class="settings-input" placeholder=".aiworkbench" style="font-family:var(--mono)">
+      <span class="settings-hint">绝对路径（如 E:\ai-data）或相对路径（相对于文件管理器根目录）</span>
+    </div>
+    <div class="settings-field" style="margin-bottom:8px">
+      <label>连接状态</label>
+      <div id="aiConnStatus" class="settings-hint" style="font-size:13px">未测试</div>
+    </div>
+  </div>
+  <div class="modal-f">
+    <button class="btn" id="aiTestBtn">测试连接</button>
+    <button class="btn" id="aiSettingsCancel">取消</button>
+    <button class="btn primary" id="aiSettingsSave">保存</button>
+  </div>
+</div>
+<div class="modal picker" id="picker">
+  <div class="modal-h"><h3>选择文件 · 图片输入</h3><button class="btn icon" id="pickerClose">×</button></div>
+  <div class="picker-tabs">
+    <button class="picker-tab active" data-ptab="fm">文件管理器</button>
+    <button class="picker-tab" data-ptab="tasks">历史任务结果</button>
+  </div>
+  <div class="picker-path" id="pickerPath">📁 /</div>
+  <div class="picker-grid" id="pickerGrid"></div>
+  <div class="modal-f">
+    <button class="btn" id="pickerCancel">取消</button>
+    <button class="btn primary" id="pickerOk">确认选择</button>
+  </div>
+</div>
+
+<!-- ===== Task Detail Drawer ===== -->
+<div class="drawer" id="drawer">
+  <div class="drawer-h">
+    <div class="dt-title" id="drawerTitle">任务详情</div>
+    <button class="btn icon" id="drawerClose">×</button>
+  </div>
+  <div class="drawer-tabs">
+    <button class="drawer-tab active" data-dtab="inputs">输入资源</button>
+    <button class="drawer-tab" data-dtab="results">生成结果</button>
+    <button class="drawer-tab" data-dtab="prompt">提交的JSON</button>
+    <button class="drawer-tab" data-dtab="log">执行日志</button>
+  </div>
+  <div class="drawer-body" id="drawerBody">
+    <div class="dpane" data-dpane="inputs"><div class="hint">无输入资源</div></div>
+    <div class="dpane hidden" data-dpane="results"><div class="hint">无生成结果</div></div>
+    <div class="dpane hidden" data-dpane="prompt"><div class="hint">无提交的 prompt</div></div>
+    <div class="dpane hidden" data-dpane="log"><div class="hint">无日志</div></div>
+  </div>
+</div>
+
+<!-- ===== Result popup ===== -->
+<div class="result-pop" id="resultPop">
+  <div class="rp-h"><span id="rpTitle">✓ 任务完成</span><button class="btn icon" id="rpClose" style="color:var(--text-2)">×</button></div>
+  <div class="rp-body">
+    <img class="rp-thumb" id="rpThumb" alt="">
+    <div class="rp-actions">
+      <a class="btn" id="rpDl" download>下载结果</a>
+      <button class="btn" id="rpDetail">查看详情</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview overlay for task detail images/videos -->
+<div class="overlay" id="mediaPreviewOverlay" style="align-items:center;justify-content:center;z-index:3000">
+  <button style="position:absolute;top:16px;right:16px;font-size:28px;color:#fff;z-index:10;background:none;border:none;cursor:pointer" id="mediaPreviewClose">✕</button>
+  <img id="mediaPreviewImg" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,.6)" hidden>
+  <video id="mediaPreviewVid" controls style="max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,.6)" hidden></video>
+</div>
+
+<script src="/ai-workbench.js"></script>
+</body>
+</html>
