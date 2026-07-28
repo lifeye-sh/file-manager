@@ -20,6 +20,10 @@ const aiWorkbenchRouter = require('./routes/ai-workbench');
 const aiStorage = require('./services/ai/storage');
 const aiTaskScheduler = require('./services/ai/task-scheduler');
 const {
+  DEFAULT_AI_WORK_DIR,
+  assertSeparatedWorkDir,
+} = require('./services/ai/work-dir-policy');
+const {
   PREFIX: canvasProxyPrefix,
   createCanvasProxy,
   attachCanvasWebSocketProxy,
@@ -68,6 +72,7 @@ const config = {
     execTimeoutMs: 600000,
     maxConcurrentTasks: 1,
     keepResultsDays: 30,
+    workDir: DEFAULT_AI_WORK_DIR,
     ...savedConfig.aiWorkbench,
     infiniteCanvas: {
       enabled: false,
@@ -135,6 +140,7 @@ app.use(canvasProxyPrefix, createCanvasProxy({ config }));
     await createDefaultAdmin();
   }
 
+  assertSeparatedWorkDir(config.aiWorkbench.workDir, config.rootDir);
   aiStorage.ensureDirs();
   aiTaskScheduler.initialize(() => ({
     rootDir: config.rootDir,

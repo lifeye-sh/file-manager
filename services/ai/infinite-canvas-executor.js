@@ -24,7 +24,7 @@ async function runTask(taskId, workflow, config) {
   const payload = executor && executor.payload || {};
   const kind = payload.kind;
   const request = payload.request;
-  if (executor.type !== 'infinite-canvas' || !['image', 'comfy', 'video', 'llm'].includes(kind)
+  if (executor.type !== 'infinite-canvas' || !['image', 'comfy', 'video', 'llm', 'image-query'].includes(kind)
       || !request || typeof request !== 'object' || Array.isArray(request)) {
     const err = new Error('Infinite-Canvas 执行器定义无效');
     err.code = 'INVALID_CANVAS_EXECUTOR';

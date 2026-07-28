@@ -18,7 +18,7 @@ const SAFE_API_PREFIXES = [
   '/api/asset-library', '/api/prompt-libraries', '/api/smart-canvas',
   '/api/conversations', '/api/canvases', '/api/projects', '/api/canvas-assets',
   '/api/canvas-workflows', '/api/image-params', '/api/models', '/api/config',
-  '/api/comfyui/instances', '/api/workflows',
+  '/api/comfyui/instances', '/api/workflows', '/api/history',
 ];
 const EXECUTION_PREFIXES = [
   '/api/canvas-image-tasks', '/api/canvas-comfy-tasks', '/api/canvas-video',
@@ -36,6 +36,12 @@ function rewriteText(text) {
     .replace(/(["'`])\/static\//g, `$1${PREFIX}/static/`)
     .replace(/(["'`])\/assets\//g, `$1${PREFIX}/assets/`)
     .replace(/(["'`])\/output\//g, `$1${PREFIX}/output/`)
+    // Unquoted CSS url() references (e.g. url(/output/x.png), url(/assets/y.png))
+    // never have a quote character preceding the leading slash, so the quoted
+    // rules above miss them and the browser 404s against the File Manager origin
+    // instead of the authenticated gateway. Rewrite them too. Only match when no
+    // quote follows url( so the quoted rules remain authoritative for quoted forms.
+    .replace(/url\(\s*(\/(?:api|static|assets|output)\/)/g, (match, path) => `url(${PREFIX}${path}`)
     .replace(/\/ws\//g, `${WS_PREFIX}/`)
     .replace(/<head([^>]*)>/i, '<head$1><script src="/infinite-canvas-bridge.js"></script>');
 }
@@ -54,10 +60,24 @@ function isAllowed(method, pathname, config) {
   if (DENIED_PREFIXES.some(prefix => pathname.startsWith(prefix))) return false;
   if (pathname === '/' || pathname.startsWith('/static/') || pathname.startsWith('/assets/')
       || pathname.startsWith('/output/')) return method === 'GET' || method === 'HEAD';
-  if (EXECUTION_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
-    return false;
-  }
+  // Execution endpoints are handled explicitly by routes/ai-workbench.js.
+  // Never fall back to this generic proxy, which would bypass the scheduler.
+  if (EXECUTION_PREFIXES.some(prefix => pathname.startsWith(prefix))) return false;
   return SAFE_API_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function upstreamWebSocketPath(pathname, search = '') {
+  const suffix = pathname.slice(WS_PREFIX.length);
+  if (suffix !== '/stats') return null;
+  return `/ws${suffix}${search}`;
+}
+
+function webSocketPayload(data, isBinary) {
+  if (isBinary) return { data, options: { binary: true } };
+  return {
+    data: Buffer.isBuffer(data) ? data.toString('utf8') : String(data),
+    options: { binary: false },
+  };
 }
 
 function buildBody(req) {
@@ -161,6 +181,12 @@ function attachCanvasWebSocketProxy(server, { config }) {
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://gateway.invalid');
     if (!url.pathname.startsWith(`${WS_PREFIX}/`)) return;
+    const upstreamPath = upstreamWebSocketPath(url.pathname, url.search);
+    if (!upstreamPath) {
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     const session = validateSession(parseCookies(req.headers.cookie).auth_token);
     const origin = req.headers.origin;
     const expectedOrigin = `http://${req.headers.host}`;
@@ -177,13 +203,22 @@ function attachCanvasWebSocketProxy(server, { config }) {
     }
     wss.handleUpgrade(req, socket, head, browserWs => {
       const target = new URL(runtime.baseUrl);
-      const upstreamPath = url.pathname.slice(WS_PREFIX.length) + url.search;
       const upstreamWs = new WebSocket(`ws://${target.host}${upstreamPath}`, {
         headers: { 'X-File-Manager-Gateway-Token': process.env.INFINITE_CANVAS_GATEWAY_TOKEN || '' },
         maxPayload: 1024 * 1024,
       });
-      browserWs.on('message', data => { if (upstreamWs.readyState === WebSocket.OPEN) upstreamWs.send(data); });
-      upstreamWs.on('message', data => { if (browserWs.readyState === WebSocket.OPEN) browserWs.send(data); });
+      browserWs.on('message', (data, isBinary) => {
+        if (upstreamWs.readyState === WebSocket.OPEN) {
+          const payload = webSocketPayload(data, isBinary);
+          upstreamWs.send(payload.data, payload.options);
+        }
+      });
+      upstreamWs.on('message', (data, isBinary) => {
+        if (browserWs.readyState === WebSocket.OPEN) {
+          const payload = webSocketPayload(data, isBinary);
+          browserWs.send(payload.data, payload.options);
+        }
+      });
       const closeBoth = () => {
         if (browserWs.readyState < WebSocket.CLOSING) browserWs.close();
         if (upstreamWs.readyState < WebSocket.CLOSING) upstreamWs.close();
@@ -201,6 +236,8 @@ module.exports = {
   WS_PREFIX,
   rewriteText,
   isAllowed,
+  upstreamWebSocketPath,
+  webSocketPayload,
   createCanvasProxy,
   attachCanvasWebSocketProxy,
 };

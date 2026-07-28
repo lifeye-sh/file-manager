@@ -10,7 +10,7 @@ const MAX_OUTPUT_BYTES = 100 * 1024 * 1024;
 const ALLOWED_HOSTS = new Set(['127.0.0.1', '[::1]']);
 const IMPORT_ID_RE = /^imp_[a-f0-9]{32}$/;
 const IMPORT_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const CANVAS_TASK_KINDS = new Set(['image', 'comfy', 'video', 'llm']);
+const CANVAS_TASK_KINDS = new Set(['image', 'comfy', 'video', 'llm', 'image-query']);
 const CANVAS_TASK_ID_RE = /^(?:canvas_img|canvas_comfy)_[a-f0-9]{32}$/;
 const OUTPUT_PATH_PREFIXES = ['/output/', '/assets/', '/api/storage-files/output/'];
 
@@ -160,6 +160,7 @@ class InfiniteCanvasClient {
       comfy: '/api/canvas-comfy-tasks',
       video: '/api/canvas-video',
       llm: '/api/canvas-llm',
+      'image-query': '/api/image-task-query',
     }[kind];
     const data = await this._requestJson(endpoint, {
       method: 'POST',

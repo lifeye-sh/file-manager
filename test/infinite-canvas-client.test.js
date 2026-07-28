@@ -179,3 +179,20 @@ test('canvas execution client submits and polls only fixed task endpoints', asyn
   assert.equal(requests[0].options.headers['X-File-Manager-Gateway-Token'], TEST_GATEWAY_TOKEN);
   await assert.rejects(() => client.submitCanvasTask('../unsafe', {}), { code: 'INVALID_CANVAS_TASK_KIND' });
 });
+
+test('legacy image query is adapted through the fixed upstream endpoint', async () => {
+  let request;
+  const client = new InfiniteCanvasClient({
+    baseUrl: 'http://127.0.0.1:7863',
+    gatewayToken: TEST_GATEWAY_TOKEN,
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return new Response(JSON.stringify({ status: 'running', task_id: 'provider-task' }), { status: 200 });
+    },
+  });
+  const result = await client.submitCanvasTask('image-query', { task_id: 'provider-task' });
+  assert.equal(result.status, 'running');
+  assert.equal(request.url, 'http://127.0.0.1:7863/api/image-task-query');
+  assert.equal(request.options.method, 'POST');
+  assert.equal(request.options.headers['X-File-Manager-Gateway-Token'], TEST_GATEWAY_TOKEN);
+});

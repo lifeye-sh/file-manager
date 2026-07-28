@@ -5,13 +5,14 @@
 const fs = require('fs');
 const path = require('path');
 const { isValidAiId, requireAiId } = require('../../utils/identifiers');
+const { DEFAULT_AI_WORK_DIR, resolveWorkDir } = require('./work-dir-policy');
 
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const CONFIG_FILE = path.join(ROOT_DIR, 'config.json');
 
 // --- workDir resolution cache (keyed by config.json mtime) ---
 let _cfgMtime = null;
-let _workDir = '.aiworkbench';
+let _workDir = DEFAULT_AI_WORK_DIR;
 let _resolved = null;       // resolved absolute workDir
 let _dirs = null;            // { root, workflows, nodeDefs, results, logs, jobs }
 let _historyFilePath = null; // absolute path to history.json
@@ -24,7 +25,7 @@ function _readWorkDirFresh() {
     if (_cfgMtime === mtime && _resolved) return; // cache hit
     const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const cfg = JSON.parse(raw);
-    _workDir = (cfg.aiWorkbench && cfg.aiWorkbench.workDir) || '.aiworkbench';
+    _workDir = (cfg.aiWorkbench && cfg.aiWorkbench.workDir) || DEFAULT_AI_WORK_DIR;
     _resolved = _resolve(_workDir);
     _dirs = {
       root: _resolved,
@@ -39,8 +40,8 @@ function _readWorkDirFresh() {
     _dirsEnsured = false; // new workDir -> need ensureDirs
     _cfgMtime = mtime;
   } catch (_) {
-    _workDir = '.aiworkbench';
-    _resolved = path.join(ROOT_DIR, '.aiworkbench');
+    _workDir = DEFAULT_AI_WORK_DIR;
+    _resolved = resolveWorkDir(_workDir, ROOT_DIR);
     _dirs = {
       root: _resolved,
       workflows: path.join(_resolved, 'workflows'),
@@ -57,11 +58,7 @@ function _readWorkDirFresh() {
 }
 
 function _resolve(wd) {
-  if (!wd || wd === '.aiworkbench') return path.join(ROOT_DIR, '.aiworkbench');
-  const norm = wd.replace(/\\/g, '/');
-  if (norm.match(/^[a-zA-Z]:\//)) return norm;
-  if (norm.startsWith('/')) return norm;
-  return path.join(ROOT_DIR, wd);
+  return resolveWorkDir(wd, ROOT_DIR);
 }
 
 function _getWorkDir() {

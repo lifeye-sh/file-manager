@@ -21,6 +21,10 @@ const {
   validateImportId,
   importAuthorizedImage,
 } = require('../services/ai/infinite-canvas-import-service');
+const {
+  DEFAULT_AI_WORK_DIR,
+  assertSeparatedWorkDir,
+} = require('../services/ai/work-dir-policy');
 
 const DEFAULT_AI_CONFIG = {
   enabled: true,
@@ -29,7 +33,7 @@ const DEFAULT_AI_CONFIG = {
   execTimeoutMs: 600000,
   maxConcurrentTasks: 1,
   keepResultsDays: 30,
-  workDir: '.aiworkbench',
+  workDir: DEFAULT_AI_WORK_DIR,
   infiniteCanvas: {
     enabled: false,
     baseUrl: 'http://127.0.0.1:7862',
@@ -48,7 +52,7 @@ function sanitizeAiConfig(input) {
   if (input.maxConcurrentTasks !== undefined) out.maxConcurrentTasks = Math.max(1, Math.min(8, parseInt(input.maxConcurrentTasks, 10) || 1));
   if (input.keepResultsDays !== undefined) out.keepResultsDays = parseInt(input.keepResultsDays, 10);
   if (input.enabled !== undefined) out.enabled = !!input.enabled;
-  if (input.workDir !== undefined) out.workDir = String(input.workDir).trim() || '.aiworkbench';
+  if (input.workDir !== undefined) out.workDir = String(input.workDir).trim() || DEFAULT_AI_WORK_DIR;
   if (input.defaultPreset !== undefined) out.defaultPreset = String(input.defaultPreset).trim() || '';
   if (input.infiniteCanvas !== undefined) {
     if (!input.infiniteCanvas || typeof input.infiniteCanvas !== 'object' || Array.isArray(input.infiniteCanvas)) {
@@ -220,6 +224,7 @@ module.exports = function ({ config }) {
     let patch;
     try {
       patch = sanitizeAiConfig(req.body || {});
+      if (patch.workDir) assertSeparatedWorkDir(patch.workDir, config.rootDir);
     } catch (err) {
       return res.status(400).json({ error: err.message, code: err.code || 'INVALID_AI_CONFIG' });
     }
@@ -320,6 +325,22 @@ module.exports = function ({ config }) {
   }
 
   for (const [routeName, kind] of [['canvas-video', 'video'], ['canvas-llm', 'llm']]) {
+    router.post(`/canvas/upstream/api/${routeName}`, async (req, res) => {
+      try {
+        const taskId = enqueueCanvasExecution(kind, req.body || {}, req.user.username);
+        const result = await waitForCanvasExecution(taskId, currentAiConfig().execTimeoutMs);
+        res.json(result);
+      } catch (err) {
+        const disabled = err.code === 'INFINITE_CANVAS_EXECUTION_DISABLED';
+        res.status(disabled ? 409 : 502).json({ error: err.message, code: err.code || 'INFINITE_CANVAS_EXECUTION_FAILED' });
+      }
+    });
+  }
+
+  // Older Infinite-Canvas views still call these synchronous endpoints.
+  // Adapt them to the same project-owned queue instead of exposing the raw
+  // upstream execution API through the generic proxy.
+  for (const [routeName, kind] of [['online-image', 'image'], ['image-task-query', 'image-query']]) {
     router.post(`/canvas/upstream/api/${routeName}`, async (req, res) => {
       try {
         const taskId = enqueueCanvasExecution(kind, req.body || {}, req.user.username);

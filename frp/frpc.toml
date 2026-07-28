@@ -4,20 +4,20 @@
 
 # --- 连接到 frp 服务端 ---
 # 替换为你的 VPS 公网 IP 或域名
-serverAddr = "182.92.67.143"
+serverAddr = "your-frp-server.example.com"
 serverPort = 7000
 
 # --- 身份验证（必须与服务端一致）---
 [auth]
 method = "token"
-token = "9sK&7pR2!zT@5bQ#8dF$3gH%0jL^6nV&1cX"
+token = "CHANGE_ME_WITH_A_RANDOM_TOKEN"
 
 # --- 客户端管理界面（可选，方便在本机查看状态）---
 [webServer]
 addr = "127.0.0.1"
 port = 7400
-user = "yuming"
-password = "a1030293"
+user = "admin"
+password = "CHANGE_ME_WITH_A_RANDOM_PASSWORD"
 
 # --- 日志 ---
 [log]

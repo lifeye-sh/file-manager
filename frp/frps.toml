@@ -15,7 +15,7 @@ bindPort = 7000
 # --- 身份验证（强烈建议开启，防止未授权客户端连接）---
 [auth]
 method = "token"
-token = "9sK&7pR2!zT@5bQ#8dF$3gH%0jL^6nV&1cX"
+token = "CHANGE_ME_WITH_A_RANDOM_TOKEN"
 
 # --- HTTP 虚拟主机端口 ---
 # 外网用户通过 http://你的域名:8080 或 http://VPS_IP:8080 访问
@@ -28,8 +28,8 @@ vhostHTTPPort = 8099
 [webServer]
 addr = "0.0.0.0"
 port = 7500
-user = "yuming"
-password = "a1030293"
+user = "admin"
+password = "CHANGE_ME_WITH_A_RANDOM_PASSWORD"
 # 可选：TLS 证书（生产环境建议开启）
 # tlsCertFile = "/path/to/cert.pem"
 # tlsKeyFile = "/path/to/key.pem"

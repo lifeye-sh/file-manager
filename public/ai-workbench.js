@@ -1102,7 +1102,7 @@ $('#wfSelect').after(delWfBtn);
 const aiSettings={modal:$('#aiSettings'),url:$('#aiComfyUrl'),timeout:$('#aiExecTimeout'),workDir:$('#aiWorkDir'),status:$('#aiConnStatus'),
   open:$('#btnAiSettings'),close:$('#aiSettingsClose'),cancel:$('#aiSettingsCancel'),save:$('#aiSettingsSave'),test:$('#aiTestBtn')};
 async function loadAiConfig(){
-  try{const c=await api.getJson('/api/ai/config');aiSettings.url.value=c.comfyuiUrl||'http://127.0.0.1:8188';aiSettings.timeout.value=Math.round((c.execTimeoutMs||600000)/1000);aiSettings.workDir.value=c.workDir||'.aiworkbench';}
+  try{const c=await api.getJson('/api/ai/config');aiSettings.url.value=c.comfyuiUrl||'http://127.0.0.1:8188';aiSettings.timeout.value=Math.round((c.execTimeoutMs||600000)/1000);aiSettings.workDir.value=c.workDir||'';}
   catch(e){/* non-admin or error — leave defaults */}
 }
 aiSettings.open.addEventListener('click',()=>{loadAiConfig();aiSettings.modal.classList.add('show');dom.overlay.classList.add('show');aiSettings.status.textContent='未测试';aiSettings.status.style.color='var(--muted)';});
@@ -1119,7 +1119,7 @@ aiSettings.test.addEventListener('click',async()=>{
 });
 aiSettings.save.addEventListener('click',async()=>{
   try{
-    await api.postJson('/api/ai/config',{comfyuiUrl:aiSettings.url.value,execTimeoutMs:parseInt(aiSettings.timeout.value,10)*1000,workDir:aiSettings.workDir.value||'.aiworkbench'});
+    await api.postJson('/api/ai/config',{comfyuiUrl:aiSettings.url.value,execTimeoutMs:parseInt(aiSettings.timeout.value,10)*1000,workDir:aiSettings.workDir.value});
     toast('设置已保存','success');closeAiSettings();refreshComfyStatus();
   }catch(e){toast(e.message,'error');}
 });

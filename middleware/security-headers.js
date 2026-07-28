@@ -10,7 +10,7 @@ function securityHeaders(req, res, next) {
     "media-src 'self' blob:; " +
     "style-src 'self' 'unsafe-inline'; " +
     "script-src 'self' 'unsafe-inline'; " +
-    "frame-src 'self' https://mozilla.github.io; " +
+    "frame-src 'self'; " +
     "connect-src 'self'"
   );
   next();

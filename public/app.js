@@ -1505,7 +1505,7 @@ async function renderMarkdownPreview(url) {
   viewArea.id = 'text-view';
   const mdContent = document.createElement('div');
   mdContent.className = 'markdown-body';
-  mdContent.innerHTML = DOMPurify.sanitize(marked.parse(text));
+  window.fileManagerMarkdown.render(mdContent, text);
   viewArea.appendChild(mdContent);
 
   // Edit mode (same as text preview)
@@ -1550,7 +1550,7 @@ async function renderMarkdownPreview(url) {
     try {
       const fp = getFilePath(state.previewFile);
       await apiSave(fp, textarea.value);
-      mdContent.innerHTML = DOMPurify.sanitize(marked.parse(textarea.value));
+      window.fileManagerMarkdown.render(mdContent, textarea.value);
       showToast('文件已保存', 'success');
       exitEdit();
     } catch (err) {
@@ -1584,9 +1584,8 @@ async function renderMarkdownPreview(url) {
 
 function renderPdfPreview(url) {
   const iframe = document.createElement('iframe');
-  iframe.src = `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(
-    window.location.origin + url
-  )}`;
+  iframe.src = url;
+  iframe.title = 'PDF preview';
   dom.previewContent.innerHTML = '';
   dom.previewContent.appendChild(iframe);
 }

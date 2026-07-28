@@ -1,5 +1,18 @@
+@echo off
+chcp 65001 >nul
+title File Manager
 
-G:
-cd G:\Work\file-manager
+:: =============================================
+:: File Manager 独立启动（无 Infinite-Canvas）
+:: =============================================
 
-node server.js
+set REPO=%~dp0
+set REPO=%REPO:~0,-1%
+
+echo 启动 File Manager...
+echo 项目目录: %REPO%
+echo.
+
+node "%REPO%\server.js"
+
+pause
