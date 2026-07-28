@@ -1,5 +1,7 @@
 # File Manager
 
+全新环境部署请先阅读：[Windows 完整安装说明](INSTALL.md)。
+
 基于 Node.js、Express 和原生浏览器 JavaScript 的安全文件管理器，提供目录浏览、媒体预览、文件操作、用户认证、AI 工作流，以及通过受控网关嵌入的 Infinite Canvas。
 
 ## 主要能力
@@ -45,6 +47,17 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 也可以双击 `start-ai.bat`。该入口调用同一个 PowerShell 启动器，由启动器生成仅存在于进程环境中的随机网关令牌，并在返回前执行健康检查。
 
+可信局域网访问时，仅将 File Manager 网关监听到所有网卡：
+
+```powershell
+.\integrations\infinite-canvas\start-debug-stack.ps1 `
+  -ComfyUiUrl 'http://192.168.3.34:8870' `
+  -FileManagerBindAddress '0.0.0.0'
+```
+
+远程浏览器访问 `http://<服务端局域网 IP>:3000/ai-workbench.html`。不要开放或转发
+`7862`、`7863`；详细的防火墙、白名单和安全要求见完整安装说明。
+
 默认访问地址：
 
 ```text
@@ -66,9 +79,8 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 {
   "root": "E:\\ManagedFiles",
   "port": 3000,
-  "bind": ["0.0.0.0"],
+  "bind": ["127.0.0.1"],
   "whitelist": [],
-  "cookieSecure": false,
   "trustedProxies": ["loopback", "127.0.0.1"],
   "aiWorkbench": {
     "enabled": true,
@@ -90,6 +102,8 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 AI 工作目录必须与文件管理托管根目录完全分离。服务端会同时检查规范化路径和已有目录的真实文件系统身份，拒绝重叠目录。
+
+默认建议只绑定环回地址。当前版本的会话 Cookie `Secure` 标志在服务端固定为 `false`，配置文件中的同名字段不会生效，因此该调试配置不应直接暴露到公网。
 
 ## Infinite Canvas 架构
 

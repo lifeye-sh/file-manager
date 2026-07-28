@@ -1,5 +1,7 @@
 param(
   [string]$ComfyUiUrl = 'http://192.168.3.34:8870',
+  [ValidateSet('127.0.0.1', '0.0.0.0')]
+  [string]$FileManagerBindAddress = '127.0.0.1',
   [string]$RuntimeBase = (Join-Path $env:LOCALAPPDATA 'FileManager\Infinite-Canvas')
 )
 
@@ -36,6 +38,7 @@ try {
 $env:INFINITE_CANVAS_GATEWAY_TOKEN = [Convert]::ToBase64String($tokenBytes)
 $env:INFINITE_CANVAS_UPSTREAM_DIR = $source
 $env:INFINITE_CANVAS_STAGING_DIR = $staging
+$env:FILE_MANAGER_INFINITE_CANVAS_DEBUG_STACK = '1'
 
 $logs = @{}
 foreach ($name in 'sidecar.out', 'sidecar.err', 'upstream.out', 'upstream.err', 'file-manager.out', 'file-manager.err') {
@@ -52,7 +55,7 @@ $upstream = Start-Process python.exe -ArgumentList @(
   '--port', '7863', '--comfyui', $ComfyUiUrl
 ) -WorkingDirectory $repo -WindowStyle Hidden -RedirectStandardOutput $logs['upstream.out'] -RedirectStandardError $logs['upstream.err'] -PassThru
 
-$fileManager = Start-Process (Get-Command node).Source -ArgumentList @('server.js', '--bind=127.0.0.1') `
+$fileManager = Start-Process (Get-Command node).Source -ArgumentList @('server.js', "--bind=$FileManagerBindAddress") `
   -WorkingDirectory $repo -WindowStyle Hidden -RedirectStandardOutput $logs['file-manager.out'] `
   -RedirectStandardError $logs['file-manager.err'] -PassThru
 
@@ -73,7 +76,9 @@ for ($attempt = 1; $attempt -le 30; $attempt++) {
     $adapter = Invoke-RestMethod 'http://127.0.0.1:7862/health' -Headers $headers -TimeoutSec 5
     $canvas = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:7863/' -Headers $headers -TimeoutSec 5
     $main = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:3000/api/csrf-token' -TimeoutSec 5
-    if ($adapter.ok -and $canvas.StatusCode -eq 200 -and $main.StatusCode -eq 200) {
+    $gatewayEnabled = (Test-Path -LiteralPath $logs['file-manager.out']) -and
+      [bool](Select-String -LiteralPath $logs['file-manager.out'] -SimpleMatch 'Infinite Canvas gateway: enabled' -Quiet)
+    if ($adapter.ok -and $canvas.StatusCode -eq 200 -and $main.StatusCode -eq 200 -and $gatewayEnabled) {
       break
     }
   } catch {
@@ -81,7 +86,7 @@ for ($attempt = 1; $attempt -le 30; $attempt++) {
   }
   if ($attempt -lt 30) { Start-Sleep -Seconds 2 }
 }
-if (-not $adapter.ok -or $canvas.StatusCode -ne 200 -or $main.StatusCode -ne 200) {
+if (-not $adapter.ok -or $canvas.StatusCode -ne 200 -or $main.StatusCode -ne 200 -or -not $gatewayEnabled) {
   $tails = foreach ($name in 'sidecar.err', 'upstream.err', 'file-manager.err') {
     $logPath = $logs[$name]
     if (Test-Path -LiteralPath $logPath) {
@@ -98,4 +103,5 @@ if (-not $adapter.ok -or $canvas.StatusCode -ne 200 -or $main.StatusCode -ne 200
   UpstreamCommit = $adapter.upstreamCommit
   UpstreamVersion = $adapter.version
   ComfyUiUrl = $ComfyUiUrl
+  FileManagerBindAddress = $FileManagerBindAddress
 }

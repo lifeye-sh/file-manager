@@ -1,5 +1,9 @@
 # Infinite-Canvas integration boundary
 
+For a complete Windows installation, including the Python virtual environment,
+pinned upstream download, SHA-256 verification, ComfyUI configuration, startup,
+logs, and troubleshooting, see [the project installation guide](../../INSTALL.md).
+
 This project integrates [hero8152/Infinite-Canvas](https://github.com/hero8152/Infinite-Canvas)
 as a separately managed, loopback-only sidecar. The upstream source is not vendored
 into this repository.

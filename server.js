@@ -39,6 +39,7 @@ process.argv.slice(2).forEach((arg) => {
 });
 
 const savedConfig = configModule.initial;
+const infiniteCanvasDebugStack = process.env.FILE_MANAGER_INFINITE_CANVAS_DEBUG_STACK === '1';
 
 function validateWhitelist(entries) {
   if (!Array.isArray(entries)) return 'whitelist must be an array';
@@ -75,10 +76,18 @@ const config = {
     workDir: DEFAULT_AI_WORK_DIR,
     ...savedConfig.aiWorkbench,
     infiniteCanvas: {
-      enabled: false,
+      enabled: infiniteCanvasDebugStack,
       baseUrl: 'http://127.0.0.1:7862',
+      upstreamBaseUrl: 'http://127.0.0.1:7863',
+      allowExecution: infiniteCanvasDebugStack,
       requestTimeoutMs: 5000,
       ...((savedConfig.aiWorkbench && savedConfig.aiWorkbench.infiniteCanvas) || {}),
+      ...(infiniteCanvasDebugStack ? {
+        enabled: true,
+        baseUrl: 'http://127.0.0.1:7862',
+        upstreamBaseUrl: 'http://127.0.0.1:7863',
+        allowExecution: true,
+      } : {}),
     },
   },
 
@@ -160,6 +169,7 @@ app.use(canvasProxyPrefix, createCanvasProxy({ config }));
   console.log(`Serving files from: ${config.rootDir}`);
   console.log('Authentication: enabled');
   console.log(`Cookie Secure flag: ${secure}`);
+  console.log(`Infinite Canvas gateway: ${config.aiWorkbench.infiniteCanvas.enabled ? 'enabled' : 'disabled'}`);
   if (config.whitelist.length > 0) {
     console.log(`Whitelist: ${config.whitelist.join(', ')}`);
   } else {
