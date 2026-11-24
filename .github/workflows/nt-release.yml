@@ -1,0 +1,34 @@
+name: Next Terminal release build
+run-name: NT release ${{ inputs.nt_request }} ${{ inputs.commit_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      nt_request:
+        required: true
+        type: string
+      commit_sha:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.commit_sha }}
+          persist-credentials: false
+      - name: Build selected commit
+        env:
+          NT_COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$NT_COMMIT_SHA"
+          bash .next-terminal/build.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
